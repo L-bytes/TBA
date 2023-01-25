@@ -22,7 +22,6 @@ intermediate=$PWD/output/hotnet/HotNet_intermediate
 results=$PWD/output/hotnet/HotNet_results
 scripts=$PWD/hierarchical-hotnet/src #Replace with directory where Hierarchical HotNet is installed
 
-mkdir -p $data
 mkdir -p $intermediate
 mkdir -p $results
 
