@@ -25,7 +25,7 @@ source('src/validation.R')
 ###             Setup               ###
 #######################################
 ### Set working directory
-setwd('C:/Users/marle/Desktop/Y2/Internship/FTD_PRODIA-main') #Replace with your working directory
+setwd('C:/Users/marle/Desktop/Y2/Internship/FTD-PRODIA_main') #Replace with your working directory
 
 ### Create output directories
 dir.create('output')
@@ -217,6 +217,7 @@ save(wgcna.net, GOenr.net, module.significance, gene.names, file='rdata/coexpres
 #load(file='rdata/coexpression.RData')
 dir.create('figures/hotnet')
 dir.create('output/hotnet')
+dir.create('output/hotnet/HotNet_input')
 
 # Get TOM matrix
 TOM <- TOMsimilarityFromExpr(t(d.norm), power=7)
@@ -249,11 +250,12 @@ for (module in modules){
   }
   node.frame <- data.frame(ID=idsModule, LogFC=log2ModuleProteins, Pvalue=PModuleProteins, Symbol=namesModule)
   rownames(node.frame) <- 1:nrow(node.frame)
+  node.frame$InvPvalue <- 1 - PModuleProteins
   write.table(node.frame, file=paste0('output/hotnet/nodes_', module, '.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
   names(namesModule) <- idsModule
   
   write.table(node.frame[, c('Symbol', 'LogFC')], file=paste0('output/hotnet/HotNet_input/g2s_log2_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-  
+  write.table(node.frame[, c('Symbol', 'InvPvalue')], file=paste0('output/hotnet/HotNet_input/g2s_Pval_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
   #nodeColorsModule <- node.colors[inModule]
   
   # Create empty dataframes
@@ -520,4 +522,4 @@ for (i in 0:17){
   t.tem <- t.test(frn)
 }
 write.table(d.array, file='module_heatmap.tsv', sep='\t', quote=FALSE, row.names=TRUE, col.names=TRUE)
-write.table(t(pval.modules.norm), file='module_pval.tsv', sep='\t', quote=FALSE, row.names=TRUE, col.names=TRUE)
+write.table(t(module.significance.norm), file='module_pval.tsv', sep='\t', quote=FALSE, row.names=TRUE, col.names=TRUE)
