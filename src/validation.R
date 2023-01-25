@@ -93,7 +93,6 @@ calculate.curve <- function(FC1, FC2, P1, P2, t.range, randomize=FALSE){
 permutation.test <- function(FC1, FC2, P1, P2, out.folder, fig.folder, m.ids=NULL, tmin=0, tmax=1, steps=31, checks=c(0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 0.8), nPerm=1000){
   if(max(checks)>tmax){stop("Maximum value in checks is larger than tmax")}
   if(min(checks)<tmin){stop("Minimum value in checks is smaller than tmin")}
-  
   # Add checkpoints for which GESS score is calculated
   #for(i in c(0.01, 0.1, 0.2, 0.5)){
   for(i in c(0.1, 0.2, 0.5, 0.8)){

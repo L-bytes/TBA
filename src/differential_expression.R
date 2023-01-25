@@ -37,10 +37,10 @@ betaBinomial <- function(d, ids, groups, g1, g2, test.type='two.sided'){
   result <- bb.test(d.sub, totals, group=new.groups, alternative=test.type, n.threads=-1)
   #p.fdr <- p.adjust(result$p.value, method='BH')
   # Data frame with Uniprot IDs and corresponding P-values
-  sign <- data.frame(Uniprot=ids, Log2ratio=mean.diff, Pvalue=result$p.value, row.names=ids)
+  sign <- data.frame(HGCN=ids, Log2ratio=mean.diff, Pvalue=result$p.value, row.names=ids)
   sign <- sign[order(sign$Pvalue, decreasing=FALSE),]
   # Fit BUM model
-  bum <- fitBumModel(result$p.value, plot=FALSE)
+  bum <- fitBumModel(result$p.value, plot=TRUE)
   # Pick P-value threshold with given FDR value
   thresholds <- data.frame(Pvalues=c(0.01, 0.05, 0.1, 0.2), counts=rep(NA, 4))
   colnames(thresholds) <- c(paste(g2, 'vs', g1, 'Pvalue', sep='_'), paste(g2, 'vs', g1, 'sign', sep='_'))

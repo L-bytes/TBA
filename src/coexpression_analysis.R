@@ -39,7 +39,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
     power <- soft.tresh $fitIndices[,1][sf.bool][1]
   }
   # Create network from chosen value of beta
-  rownames(d) <- paste(rownames(d), 1:26, sep='_')
+  rownames(d) <- paste(rownames(d), length(groups), sep='_')
   coex.net <- blockwiseModules(d, power=power,
                                TOMType="unsigned", minModuleSize=15,
                                reassignThreshold=0, mergeCutHeight=0.25,
@@ -59,9 +59,9 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
   dev.off()
   # Plot distribution of eigengene expression values for each module, and calculate significance of differential expression within the modules
   MEs <- coex.net$MEs
-  ME.control <- MEs[str_detect(rownames(MEs), 'control'),]
-  ME.TAU <- MEs[str_detect(rownames(MEs), 'TAU'),]
-  ME.TDP <- MEs[str_detect(rownames(MEs), 'TDP'),]
+  ME.WT <- MEs[str_detect(rownames(MEs), 'WT'),]
+  ME.SNV <- MEs[str_detect(rownames(MEs), 'SNV'),]
+  
   
   # Table with P-values for distribution of log2 values
   pvals.modules <- data.frame(matrix(nrow=n.modules, ncol=ncol(d.log2fc)))
@@ -72,19 +72,16 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
     module <- labels2colors(i)
     # Plot module eigengene expression
     png(paste0(figfolder, '/ME_distribution_', i, '_', module, '.png'))
-    boxplot(ME.TAU[,paste0('ME', i)], ME.TDP[,paste0('ME', i)], ME.control[,paste0('ME', i)], names=c('TAU', 'TDP', 'Control'),
+    boxplot(ME.SNV[,paste0('ME', i)], ME.WT[,paste0('ME', i)], names=c('SNV', 'WT'),
             col=module, xlab='group', ylab='ME value')
     dev.off()
     # Calculate if distribution of log2FC values between the groups are significantly different from zero in each module
     #pval.modules <- data.frame()
-    for (j in 1:ncol(d.log2fc)){
-      #logvals <- d.log2fc[names(coex.net$colors[coex.net$colors==i]), j]
-      logvals <- d.log2fc[names(coex.net$colors[coex.net$colors==i]), j]
-      t.stat <- t.test(logvals)
-      pvals.modules[module, j] <- t.stat$p.value
-      print(c(module, median(logvals), sd(logvals), length(logvals)))
+    logvals <- d.log2fc[names(coex.net$colors[coex.net$colors==i]),]
+    t.stat <- t.test(logvals)
+    pvals.modules[module] <- t.stat$p.value
+    print(c(module, median(logvals), sd(logvals), length(logvals)))
     }
-  }
   # Multiple testing correction
   p.adj <- p.adjust(unlist(pvals.modules))
   pval.modules.adj <- pvals.modules
@@ -107,10 +104,10 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
 #' @param out.folder Output folder for data files
 #' @return Object with GO enrichment statistics per module and a heatmap showing the log2FC values of the top 10 enriched GO terms
 
-GO.terms.modules <- function(coex.net, IDs, log2values, names, entrez.ids, fig.folder, out.folder){
+GO.terms.modules <- function(coex.net, IDs, log2values, entrez.ids, fig.folder, out.folder){
   # GO enrichment analysis of the modules
   #expr2ID <- match(ids, d.summary$Entry)
-  allEntrezIDs <- unlist(lapply(d.summary$Cross.reference..GeneID., function(x){strsplit(x, split=';')[[1]][1]}))
+  allEntrezIDs <- entrez.ids
   names(allEntrezIDs) <- IDs
   moduleColors <- labels2colors(coex.net$colors)
   modules <- levels(as.factor(moduleColors))
@@ -152,12 +149,10 @@ GO.terms.modules <- function(coex.net, IDs, log2values, names, entrez.ids, fig.f
     inModule <- moduleColors == module
     # Original IDs
     idsModule <- IDs[inModule]
-    # Gene names
-    namesModule <- names[idsModule]
-    for (j in 1:length(namesModule)){
+    for (j in 1:length(idsModule)){
       # If there is no gene name associated with the Uniprot ID, keep the uniprot ID
-      if (is.na(namesModule[j])){
-        namesModule[j] <- idsModule[j]
+      if (is.na(idsModule[j])){
+        idsModule[j] <- idsModule[j]
       }
     }
     # Log2FC values of proteins in module
@@ -186,7 +181,7 @@ GO.terms.modules <- function(coex.net, IDs, log2values, names, entrez.ids, fig.f
     # to be plotted as a heatmap
     d.GO <- data.frame(matrix(data=NA, ncol=sum(inModule), nrow=length(GOTermsModule)))
     rownames(d.GO) <- unlist(lapply(GOTermsModule, function(x){GOTERM[[x]]@Term}))
-    colnames(d.GO) <- namesModule
+    colnames(d.GO) <- idsModule
     GOcounts <- list()
     
     for (term in GOTermsModule) {

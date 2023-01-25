@@ -10,7 +10,7 @@
 normalize.sample <- function(d){
   # Normalize raw data based on total protein count per sample. input the Protein IDs as rows, samples as columns
   m <- apply(d, 2, mean)
-  d.norm <- t(t(d)/m) * mean(d)
+  d.norm <- t(t(d)/m) * apply(d, c(1, 2), mean)
   return(d.norm)
 }
 
