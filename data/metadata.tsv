@@ -1,0 +1,27 @@
+sample 	group	group	type	mutation	NHB ID	Section ID	age 	gender	TAU (AT8)	TDP43 	p62	Amyloid beta plaques
+1	FTD_TDP	TDP	genetic	C9ORF (NBB)	1995-080	S95/231	63	m	0	pos	pos	ND
+2	FTD_TAU	TAU	genetic	MAPT (NBB)	1996-059	96/169	68	m	pos	0	ND	0
+3	FTD_TDP 	TDP	genetic	GRN (new mut)	1998-037	98/061	59	m	0	pos	ND	ND
+4	FTD_TDP 	TDP	sporadic	no	1999-019	99/047	57	f	0	pos	ND	0
+5	FTD_TDP	TDP	genetic	C9ORF (NBB)	2000-055	S00/116	58	m	0	pos	ND	ND
+6	FTD_TDP 	TDP	sporadic	no	2001-089	S01/200	68	f	0	pos	ND	ND
+7	FTD_TAU	TAU	genetic	MAPT (NBB)	2003-026	S03/055	54	f	pos	0	0	ND
+8	FTD_TAU	TAU	genetic	MAPT (NBB)	2003-049	S03/137	64	f	pos	0	pos	ND
+9	FTD_TDP 	TDP	genetic	C9ORF (NBB)	2003-051	03/140	75	m	0	pos	ND	0
+10	FTD_TAU	TAU	genetic	MAPT (NBB)	2004-052	S04/165	46	m	pos	0	ND	ND	
+11	FTD_TDP 	TDP	sporadic	no	2005-007	S05/026	69	m	0	0	ND	ND
+12	FTD_TDP 	TDP	sporadic	no	2005-009	S05/034	67	m	0	pos 	ND	ND
+13	FTD_TAU	TAU	genetic	MAPT (NBB)	2008-025	08/079	61	f	pos	?	ND	0
+14	FTD_TAU	TAU	genetic	MAPT (NBB)	2008-093	S08/288	56	m	pos	0	ND	ND
+15	NDC	CON	0	CON	2009-039	09/128	82	m	0	0	ND	pos
+16	FTD_TDP 	TDP	sporadic	no	2010-003	S10/009	69	m	pos but weak	pos but weak	pos but weak	ND
+17	NDC	CON	0	CON	2010-015	S10/035	73	f	0	0	0	ND
+18	FTD_TDP 	TDP	genetic	C9ORF (NBB)	2010-039	S10/109	64	m	0	0	ND	ND
+19	FTD_TDP	TDP	genetic	GRN (NBB)	2010-109	10/316	60	f	0	pos	ND	0
+20	FTD_TDP 	TDP	genetic	C9ORF (NBB)	2010-126	10/353	69	f	0	pos	ND	0
+21	FTD_TDP	TDP	genetic	C9ORF (NBB)	2010-026	10-054	70	f	0	"pos (threads, few)"	"pos (threads, few)"	ND
+22	NDC	CON	0	CON	2012-002	2012-002	55	m	0	0	ND	0
+23	NDC	CON	0	CON	2012-071	2012-071	57	f	0	0	ND	pos (few)
+24	FTD_TDP	TDP	genetic	C9ORF (NBB)	2012-116	2012-116	52	f	0	pos	ND	0
+25	FTD_TDP 	TDP	genetic	C9ORF (NBB)	2013-069	2013-069	75	f	0	pos	ND	0
+26	NDC	CON	0	CON	2014-43	2014-43	60	f	0	0	ND	0
