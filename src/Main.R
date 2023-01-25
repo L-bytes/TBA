@@ -25,7 +25,7 @@ source('src/validation.R')
 ###             Setup               ###
 #######################################
 ### Set working directory
-setwd('C:/Users/marle/Desktop/Y2/Internship/FTD_PRODIA-main2/FTD_PRODIA-main') #Replace with your working directory
+setwd('C:/Users/marle/Desktop/Y2/Internship/FTD_PRODIA-main') #Replace with your working directory
 
 ### Create output directories
 dir.create('output')
