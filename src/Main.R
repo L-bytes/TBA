@@ -12,6 +12,7 @@ library(pheatmap)
 library(WGCNA)
 library(countdata)
 library(DESeq2)
+BiocManager::install("apeglm")
 library('org.Hs.eg.db')
 options(stringsAsFactors=FALSE)
 # Load required functions from the src directory
@@ -36,8 +37,8 @@ dir.create('rdata')
 
 
 ### Load data
-d <- read.table('./data/TCGA/TCGA_rna_count_data.txt', header=TRUE, sep='\t', quote="", row.names = 1, check.names=FALSE)
-group.data <- read.table('./data/TCGA/non_silent_mutation_profile_crc.txt', header=TRUE, sep='\t', quote="", row.names = 1, check.names=FALSE)
+d <- read.table('./data/TCGA_rna_count_data.txt', header=TRUE, sep='\t', quote="", row.names = 1, check.names=FALSE)
+group.data <- read.table('./data/non_silent_mutation_profile_crc.txt', header=TRUE, sep='\t', quote="", row.names = 1, check.names=FALSE)
 
 # Get only the columns with expression values
 
@@ -56,7 +57,9 @@ d.raw <- apply(d.raw, c(1,2), as.numeric)
 # Get identifiers of genes
 ids <- rownames(d.raw)
 groups <- group.data$KRAS
-colnames(d.raw) <- groups
+# colnames(d.raw) <- groups
+count.groups <- d.raw
+colnames(count.groups) <- groups
 # Save input data
 save(d.raw, group.data, groups, ids, file='rdata/input_data.RData')
 
@@ -73,23 +76,44 @@ colnames(d.cs) <- paste(groups, 1:length, sep='_')
 # save input data into a file
 save(d.norm, d.cs, ids, groups, file='rdata/normalized_data.rdata')
 
-# DE-SEQ
-# groups.condition <- factor(groups)
-# cts <- as.matrix(d.raw)
-# cts <- cts[, rownames(groups)]
-# all(rownames(groups) == colnames(cts))
-# dds <- DESeqDataSetFromMatrix(countData = cts,
-#                               colData = groups,
-#                               design = ~ groups.condition)
-# dds
-# keep <- rowSums(counts(dds)) >= 10
-# dds <- dds[keep,]
-# dds <- DESeq(dds)
-# res <- results(dds)
-# results.names <- resultsNames(dds)
-# res
-# results.names
-# resLFC <- lfcShrink(dds, coef="SNV_vs_WNT", type="apeglm")
+#DE-SEQ
+group.KRAS <- as.matrix(group.data[,"KRAS"])
+rownames(group.KRAS) <- rownames(group.data)
+colnames(group.KRAS) <- c("KRAS")
+group.KRAS[,1] <- as.numeric(factor(group.KRAS[,1]))
+dds <- DESeqDataSetFromMatrix(countData = d.raw, colData = group.KRAS, design = ~ KRAS)
+dds
+keep <- rowSums(counts(dds)) >= 10
+dds <- dds[keep,]
+dds <- DESeq(dds)
+res <- results(dds)
+results.names <- resultsNames(dds)
+res
+results.names
+
+#Normalization
+dds2 <- estimateSizeFactors(dds)
+vsd <- varianceStabilizingTransformation(dds2, blind=F)
+normalized_counts <- counts(dds2, normalized=TRUE)
+
+# resLFC <- lfcShrink(dds, coef="KRAS_2_vs_1", type="apeglm")
+# resLFC
+
+#Some plots
+# idx <- identify(res$baseMean, res$log2FoldChange)
+# rownames(res)[idx]
+# plotCounts(dds, gene=which.min(res$padj), intgroup="KRAS")
+# ntd <- normTransform
+# BiocManager::install("vsn")
+# library("vsn")
+# meanSdPlot(assay(ntd))
+# library("pheatmap")
+# select <- order(rowMeans(counts(dds,normalized=TRUE)),
+#                 decreasing=TRUE)
+# df <- as.data.frame(colData(dds)[,c("KRAS")])
+# rownames(df) <- colnames(assay(ntd)[select,])
+# pheatmap(assay(ntd)[select,], cluster_rows=FALSE, show_rownames=FALSE, cluster_cols=FALSE, annotation_col=df)
+# plotDispEsts(dds)
 
 #######################################
 ### Differential expression analysis###
@@ -109,10 +133,6 @@ write.table(bb$table, file='output/differential_expression/sign_test.tsv', row.n
 write.table(sign.table, file='output/differential_expression/FDR_pval_summary.tsv', sep='\t', quote=FALSE)
 write.table(d.summary, file='output/differential_expression/log2_pval_uniprot.tsv', sep='\t', row.names=FALSE, col.names=TRUE, quote=FALSE)
 save(bb, sign.table, d.summary, file='rdata/differential_expression.RData')
-# Write input format for GSEA (Note GSEA is run as a separate tool, this is not part of the R workflow)
-#d.TAU.con <- data.frame(Uniprot=bb.TAU.con$table$Uniprot, diff=bb.TAU.con$table$Log2ratio)
-#write.table(d.TAU.con[order(d.TAU.con$diff, decreasing=TRUE),], file='Output/GSEA/diff_TAU_control_log2.rnk',
-#            quote=FALSE, sep='\t', row.names=FALSE, col.names=FALSE)
 
 #######################################
 ###          Clustering             ###
