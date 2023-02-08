@@ -46,7 +46,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
                                numericLabels=TRUE, pamRespectsDendro=FALSE,
                                saveTOMs=TRUE, saveTOMFileBase="rdata/coexpression_discovery", verbose=3)
   # Merge M18 (lightgreen) into M9 (magenta), since they were highly similar
-  coex.net$colors <- replace(coex.net$colors, coex.net$colors==18, 9)
+  # coex.net$colors <- replace(coex.net$colors, coex.net$colors==18, 9)
   # Plot modules and gene hierarchical clustering
   moduleColors <- labels2colors(coex.net$colors)
   modules <- levels(as.factor(moduleColors))
@@ -68,7 +68,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
   colnames(pvals.modules) <- colnames(d.log2fc)
   rownames(pvals.modules) <- modules
   
-  for (i in 0:(n.modules-1)){
+  for (i in 1:(n.modules-1)){
     module <- labels2colors(i)
     # Plot module eigengene expression
     png(paste0(figfolder, '/ME_distribution_', i, '_', module, '.png'))
@@ -142,7 +142,7 @@ GO.terms.modules <- function(coex.net, IDs, log2values, entrez.ids, fig.folder, 
   colors = c(seq(-5,-1,length=1000),seq(-.999999,.999999,length=1000),seq(1, 5,length=1000))
   my_palette <- colorRampPalette(c("blue", "white", "red"))(n = 2999)
   
-  for (i in 0:(n.modules-1)){
+  for (i in 1:(n.modules-1)){
     module <- labels2colors(i)
     #print(module)
     # Select proteins in the module

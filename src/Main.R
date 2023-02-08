@@ -12,7 +12,6 @@ library(pheatmap)
 library(WGCNA)
 library(countdata)
 library(DESeq2)
-BiocManager::install("apeglm")
 library('org.Hs.eg.db')
 options(stringsAsFactors=FALSE)
 # Load required functions from the src directory
@@ -90,11 +89,16 @@ res <- results(dds)
 results.names <- resultsNames(dds)
 res
 results.names
+colnames(d.raw) <- groups
 
 #Normalization
 dds2 <- estimateSizeFactors(dds)
 vsd <- varianceStabilizingTransformation(dds2, blind=F)
-normalized_counts <- counts(dds2, normalized=TRUE)
+d.adj <- counts(dds2, normalized=TRUE)
+colnames(d.adj) <- groups
+
+d.summary <- data.frame(unlist(res$log2FoldChange),unlist(res$pvalue), unlist(res$padj), row.names = ids)
+colnames(d.summary) <- c("log2FC", "Pvalue", "PvalueAdj")
 
 # resLFC <- lfcShrink(dds, coef="KRAS_2_vs_1", type="apeglm")
 # resLFC
@@ -120,56 +124,56 @@ normalized_counts <- counts(dds2, normalized=TRUE)
 #######################################
 ### Test significance of differential expression between the groups
 # load(file='rdata/normalized_data.RData')
-dir.create('output/differential_expression')
-# Beta binomial test
-bb <- betaBinomial(d.norm, ids, groups, 'WT', 'SNV', 'two.sided')
-d.sign <- data.frame(log2FC=bb$table[ids,]$Log2ratio, Pvalue=bb$table[ids,]$Pvalue)
-rownames(d.sign) <- ids
-# Merge stats about P-value thresholds and number of significant proteins
-sign.table <- cbind(bb$FDRs)
-d.summary <- d.sign
-# Write output into files
-write.table(bb$table, file='output/differential_expression/sign_test.tsv', row.names=FALSE, col.names=TRUE, sep='\t', quote=FALSE)
-write.table(sign.table, file='output/differential_expression/FDR_pval_summary.tsv', sep='\t', quote=FALSE)
-write.table(d.summary, file='output/differential_expression/log2_pval_uniprot.tsv', sep='\t', row.names=FALSE, col.names=TRUE, quote=FALSE)
-save(bb, sign.table, d.summary, file='rdata/differential_expression.RData')
+# dir.create('output/differential_expression')
+# # Beta binomial test
+# bb <- betaBinomial(d.norm, ids, groups, 'WT', 'SNV', 'two.sided')
+# d.sign <- data.frame(log2FC=bb$table[ids,]$Log2ratio, Pvalue=bb$table[ids,]$Pvalue)
+# rownames(d.sign) <- ids
+# # Merge stats about P-value thresholds and number of significant proteins
+# sign.table <- cbind(bb$FDRs)
+# d.summary <- d.sign
+# # Write output into files
+# write.table(bb$table, file='output/differential_expression/sign_test.tsv', row.names=FALSE, col.names=TRUE, sep='\t', quote=FALSE)
+# write.table(sign.table, file='output/differential_expression/FDR_pval_summary.tsv', sep='\t', quote=FALSE)
+# write.table(d.summary, file='output/differential_expression/log2_pval_uniprot.tsv', sep='\t', row.names=FALSE, col.names=TRUE, quote=FALSE)
+# save(bb, sign.table, d.summary, file='rdata/differential_expression.RData')
 
 #######################################
 ###          Clustering             ###
 #######################################
 #load(file='rdata/normalized_data.RData')
 #load(file='rdata/differential_expression.RData')
-dir.create('figures/clustering')
-# Set colors for the different significance levels
-ann_colors <- list(group=c(SNV='#F39C12', WT='#73B761'),
-                   SNV_WT=c(FDR1='#000066', FDR2='#0000CC', FDR3='#3399FF', FDR4='#99CCFF', insignificant='#CCCCCC'))
-names(ann_colors$SNV_WT) <- c('FDR = 0.01', 'FDR = 0.05', 'FDR = 0.1', 'FDR = 0.2', 'insignificant')
-# Column group annotations (match to the column names of d.cs)
-ann_col <- data.frame(group=as.factor(groups))
-rownames(ann_col) <- paste(groups, 1:length(groups), sep='_')
-
-
-# Significance for each of the individual comparisons
-# TAU vs control
-thresholds <- sign.table[,'SNV_vs_WT_Pvalue']
-names(thresholds) <- rownames(sign.table)
-sign.SNVWT <- add.sign.labels(bb, thresholds)
-ann_row <- data.frame(SNV_WT=factor(sign.SNVWT, labels=c('FDR = 0.05', 'FDR = 0.1', 'FDR = 0.2', 'insignificant')))
-
-# Top 50 most significant in each differential expression analysis, combined
-sign.rows <- bb$table$HGCN[bb$table$Pvalue <= sort(bb$table$Pvalue)[50]]
-ids.sign.all <- ids[ids %in% sign.rows]
-ann_row4 <- data.frame(SNV_WT=factor(sign.SNVWT[ids.sign.all], labels=c('FDR = 0.05', 'FDR = 0.1', 'FDR = 0.2', 'insignificant')))
-rownames(ann_row4) <- ids.sign.all
-
-
-# Create clustering heatmaps
-h.all <- Clustering(d.cs, ann_col=ann_col, anncol=ann_colors, f='figures/clustering/clustering_all.png')
-h.SNVWT <- Clustering(d.cs, ann_col=ann_col, ann_row=ann_row4, anncol=ann_colors, f='figures/clustering/clustering_SNVWT_all.png')
-h.SNVWT.sign <- Clustering(d.cs[sign.SNVWT[rownames(d.cs)]<5,], ann_col=ann_col, ann_row=data.frame(SNV_WT=ann_row[sign.SNVWT<5,], row.names=rownames(ann_row)[sign.SNVWT<5]),
-                            anncol=ann_colors, f='figures/clustering/clustering_SNVWT_sign.png')
-h.top50.sign <- Clustering(d.cs[ids.sign.all,], ann_col=ann_col, ann_row=ann_row4,
-                            anncol=ann_colors, f='figures/clustering/clustering_top50_sign.png')
+# dir.create('figures/clustering')
+# # Set colors for the different significance levels
+# ann_colors <- list(group=c(SNV='#F39C12', WT='#73B761'),
+#                    SNV_WT=c(FDR1='#000066', FDR2='#0000CC', FDR3='#3399FF', FDR4='#99CCFF', insignificant='#CCCCCC'))
+# names(ann_colors$SNV_WT) <- c('FDR = 0.01', 'FDR = 0.05', 'FDR = 0.1', 'FDR = 0.2', 'insignificant')
+# # Column group annotations (match to the column names of d.cs)
+# ann_col <- data.frame(group=as.factor(groups))
+# rownames(ann_col) <- paste(groups, 1:length(groups), sep='_')
+# 
+# 
+# # Significance for each of the individual comparisons
+# # TAU vs control
+# thresholds <- sign.table[,'SNV_vs_WT_Pvalue']
+# names(thresholds) <- rownames(sign.table)
+# sign.SNVWT <- add.sign.labels(bb, thresholds)
+# ann_row <- data.frame(SNV_WT=factor(sign.SNVWT, labels=c('FDR = 0.05', 'FDR = 0.1', 'FDR = 0.2', 'insignificant')))
+# 
+# # Top 50 most significant in each differential expression analysis, combined
+# sign.rows <- bb$table$HGCN[bb$table$Pvalue <= sort(bb$table$Pvalue)[50]]
+# ids.sign.all <- ids[ids %in% sign.rows]
+# ann_row4 <- data.frame(SNV_WT=factor(sign.SNVWT[ids.sign.all], labels=c('FDR = 0.05', 'FDR = 0.1', 'FDR = 0.2', 'insignificant')))
+# rownames(ann_row4) <- ids.sign.all
+# 
+# 
+# # Create clustering heatmaps
+# h.all <- Clustering(d.cs, ann_col=ann_col, anncol=ann_colors, f='figures/clustering/clustering_all.png')
+# h.SNVWT <- Clustering(d.cs, ann_col=ann_col, ann_row=ann_row4, anncol=ann_colors, f='figures/clustering/clustering_SNVWT_all.png')
+# h.SNVWT.sign <- Clustering(d.cs[sign.SNVWT[rownames(d.cs)]<5,], ann_col=ann_col, ann_row=data.frame(SNV_WT=ann_row[sign.SNVWT<5,], row.names=rownames(ann_row)[sign.SNVWT<5]),
+#                             anncol=ann_colors, f='figures/clustering/clustering_SNVWT_sign.png')
+# h.top50.sign <- Clustering(d.cs[ids.sign.all,], ann_col=ann_col, ann_row=ann_row4,
+#                             anncol=ann_colors, f='figures/clustering/clustering_top50_sign.png')
 
 #######################################
 ###   WGCNA coexpression analysis   ###
@@ -181,8 +185,9 @@ h.top50.sign <- Clustering(d.cs[ids.sign.all,], ann_col=ann_col, ann_row=ann_row
 dir.create('figures/coexpression')
 dir.create('output/coexpression')
 
-d.log2vals <- as.data.frame(d.summary[, c('log2FC')], row.names=row.names(d.summary), col.names=c('log2FC'))
-coexpression <- coexpression.analysis(t(d.norm), d.log2vals, 'output/coexpression', 'figures/coexpression')
+d.log2vals <- as.data.frame(d.summary[, c('log2FC')], row.names=row.names(d.summary))
+colnames(d.log2vals) <- c('log2FC')
+coexpression <- coexpression.analysis(t(d.adj), d.log2vals, 'output/coexpression', 'figures/coexpression')
 wgcna.net <- coexpression[[1]]
 module.significance <- coexpression[[2]]
 # Merge M18 (lightgreen) into M9 (magenta), since they were highly similar
