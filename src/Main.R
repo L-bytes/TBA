@@ -10,18 +10,18 @@ library(stringr)
 library(BiocManager)
 library(BioNet)
 library(pheatmap)
-library(WGCNA)
 library(countdata)
 library(DESeq2)
 library('org.Hs.eg.db')
+library(WGCNA)
 options(stringsAsFactors=FALSE)
 # Load required functions from the src directory
-source(argv[2],'/src/preprocessing.R')
-source(argv[2],'/src/differential_expression.R')
+source(paste(argv[2],'/src/preprocessing.R', sep=""))
+source(paste(argv[2],'/src/differential_expression.R', sep=""))
 #source('src/add_uniprot_info.R')
-source(argv[2],'/src/clustering.R')
-source(argv[2],'/src/coexpression_analysis.R')
-source(argv[2],'/src/validation.R')
+source(paste(argv[2],'/src/clustering.R', sep=""))
+source(paste(argv[2],'/src/coexpression_analysis.R', sep=""))
+source(paste(argv[2],'/src/validation.R', sep=""))
 
 
 #######################################
@@ -34,7 +34,6 @@ setwd(argv[1]) #Replace with your working directory
 dir.create('output')
 dir.create('figures')
 dir.create('rdata')
-
 
 ### Load data
 d <- read.table('./data/TCGA_rna_count_data.txt', header=TRUE, sep='\t', quote="", row.names = 1, check.names=FALSE)
@@ -67,7 +66,7 @@ save(d.raw, group.data, groups, ids, file='rdata/input_data.RData')
 #######################################
 ###         Preprocessing           ###
 #######################################
-load(file='rdata/input_data.rdata')
+#load(file='rdata/input_data.rdata')
 d.norm <- normalize.sample(d.raw)
 d.cs <- normalize.cs(d.norm)
 length <- length(groups)
@@ -304,7 +303,8 @@ for (module in modules){
 ######### Run hierarchical hotnet to obtain the most significant submodule within each of the identified modules
 ######### Note that the HotNet package was written in Python and needs to be intstalled separately on your machine
 system('module load py')
-system(argv[2],'/src/run_hierarchicalHotnet_modules.sh')
+system(paste('bash', paste(argv[2],'/src/run_hierarchicalHotnet_modules.sh', sep="")))
+system('module load R')
 
 #######################################
 ###          Validation             ###

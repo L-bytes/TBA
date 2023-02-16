@@ -3,6 +3,8 @@
 # Load modules.
 import numpy as np, scipy as sp, scipy.optimize
 import sys, argparse
+import warnings
+warnings.filterwarnings('ignore')
 
 from common import hh_similarity_matrix
 from hhio import load_edge_list, save_matrix
