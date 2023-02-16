@@ -16,12 +16,12 @@ library(DESeq2)
 library('org.Hs.eg.db')
 options(stringsAsFactors=FALSE)
 # Load required functions from the src directory
-source(argv[2],'src/preprocessing.R')
-source(argv[2],'src/differential_expression.R')
+source(argv[2],'/src/preprocessing.R')
+source(argv[2],'/src/differential_expression.R')
 #source('src/add_uniprot_info.R')
-source(argv[2],'src/clustering.R')
-source(argv[2],'src/coexpression_analysis.R')
-source(argv[2],'src/validation.R')
+source(argv[2],'/src/clustering.R')
+source(argv[2],'/src/coexpression_analysis.R')
+source(argv[2],'/src/validation.R')
 
 
 #######################################
@@ -303,9 +303,8 @@ for (module in modules){
 
 ######### Run hierarchical hotnet to obtain the most significant submodule within each of the identified modules
 ######### Note that the HotNet package was written in Python and needs to be intstalled separately on your machine
-system('module load 2021')
-system('module load Python/3.9.5-GCCcore-10.3.0')
-system('bash src/run_hierarchicalHotnet_modules.sh')
+system('module load py')
+system(argv[2],'/src/run_hierarchicalHotnet_modules.sh')
 
 #######################################
 ###          Validation             ###

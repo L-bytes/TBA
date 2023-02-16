@@ -20,7 +20,7 @@ echo "Creating directory topology"
 data=$TMPDIR/output/hotnet/HotNet_input
 intermediate=$TMPDIR/output/hotnet/HotNet_intermediate
 results=$TMPDIR/output/hotnet/HotNet_results
-scripts=$HOME/hierarchical-hotnet/src #Replace with directory where Hierarchical HotNet is installed
+scripts=$HOME/Project/hierarchical-hotnet/src #Replace with directory where Hierarchical HotNet is installed
 
 mkdir -p $intermediate
 mkdir -p $results
