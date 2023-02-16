@@ -1,6 +1,7 @@
 ####### Main workflow in the paper
 # If you only want to run part of the workflow, you can load the required data from the previous steps as indicated in each section below (load(...))
-
+### Set working directory to scratch on LISA
+argv = commandArgs(trailingOnly=TRUE)
 #######################################
 ###      Load required packages     ###
 #######################################
@@ -15,19 +16,19 @@ library(DESeq2)
 library('org.Hs.eg.db')
 options(stringsAsFactors=FALSE)
 # Load required functions from the src directory
-source('src/preprocessing.R')
-source('src/differential_expression.R')
+source(argv[2],'src/preprocessing.R')
+source(argv[2],'src/differential_expression.R')
 #source('src/add_uniprot_info.R')
-source('src/clustering.R')
-source('src/coexpression_analysis.R')
-source('src/validation.R')
+source(argv[2],'src/clustering.R')
+source(argv[2],'src/coexpression_analysis.R')
+source(argv[2],'src/validation.R')
 
 
 #######################################
 ###             Setup               ###
 #######################################
-### Set working directory
-setwd('C:/Users/marle/Desktop/Y2/Internship/Project') #Replace with your working directory
+### Set working directory to scratch on LISA
+setwd(argv[1]) #Replace with your working directory
 
 ### Create output directories
 dir.create('output')
@@ -302,6 +303,8 @@ for (module in modules){
 
 ######### Run hierarchical hotnet to obtain the most significant submodule within each of the identified modules
 ######### Note that the HotNet package was written in Python and needs to be intstalled separately on your machine
+system('module load 2021')
+system('module load Python/3.9.5-GCCcore-10.3.0')
 system('bash src/run_hierarchicalHotnet_modules.sh')
 
 #######################################
