@@ -13,6 +13,7 @@ library(WGCNA)
 library(countdata)
 library(DESeq2)
 library('org.Hs.eg.db')
+library(clusterProfiler)
 options(stringsAsFactors=FALSE)
 # Load required functions from the src directory
 source('src/preprocessing.R')
@@ -178,9 +179,9 @@ colnames(d.summary) <- c("log2FC", "Pvalue", "PvalueAdj")
 #######################################
 ###   WGCNA coexpression analysis   ###
 #######################################
-#load(file='rdata/input_data.RData')
-#load(file='rdata/normalized_data.RData')
-#load(file='rdata/differential_expression.RData')
+# load(file='rdata/input_data.rdata')
+# load(file='rdata/normalized_data.rdata')
+# load(file='rdata/differential_expression.rdata')
 #source('src/coexpression_analysis_prep.R')
 dir.create('figures/coexpression')
 dir.create('output/coexpression')
@@ -196,6 +197,7 @@ log2vals <- d.summary$log2FC
 names(log2vals) <- ids
 gns<-mapIds(org.Hs.eg.db, keys = ids, column = "ENTREZID", keytype = "SYMBOL")
 GOenr.net <- GO.terms.modules(wgcna.net, ids, log2vals, gns, 'figures/coexpression', 'output/coexpression')
+
 # Save data structures
 save(wgcna.net, GOenr.net, module.significance, ids, file='rdata/coexpression.RData')
 
@@ -303,6 +305,17 @@ for (module in modules){
 ######### Run hierarchical hotnet to obtain the most significant submodule within each of the identified modules
 ######### Note that the HotNet package was written in Python and needs to be intstalled separately on your machine
 system('bash src/run_hierarchicalHotnet_modules.sh')
+
+#GSEA
+for (module in modules){
+    #Read in genes
+    inSubnetwork <- read.csv(paste('/output/hotnet/HotNet_results/consensus_nodes_log2_003_', module, sep=''), sep='/')
+    idsSubnetwork<- ids[inSubnetwork]
+    log2Subnetwork <- log2.SNV.WT[inSubnetwork]
+    geneList <- log2Subnetwork
+    PSubnetwork <- P.SNV.WT[inSubnetwork]
+    gsea <- gseGO(geneList=inSubnetwork, ont="BP", keyType = "SYMBOL", pvalueCutoff = 0.05, OrgDb=org.Hs.eg.db)
+}
 
 #######################################
 ###          Validation             ###
