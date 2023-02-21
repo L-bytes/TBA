@@ -16,6 +16,9 @@
 ################################################################################
 
 ### Create data, intermediate data and results, and results directories.
+module purge
+module load 2022
+module load py
 echo "Creating directory topology"
 data=$TMPDIR/output/hotnet/HotNet_input
 intermediate=$TMPDIR/output/hotnet/HotNet_intermediate

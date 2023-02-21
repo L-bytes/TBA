@@ -302,7 +302,6 @@ for (module in modules){
 
 ######### Run hierarchical hotnet to obtain the most significant submodule within each of the identified modules
 ######### Note that the HotNet package was written in Python and needs to be intstalled separately on your machine
-system('module load py')
 system(paste('bash', paste(argv[2],'/src/run_hierarchicalHotnet_modules.sh', sep="")))
 system('module load R')
 
