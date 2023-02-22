@@ -96,6 +96,7 @@ dds2 <- estimateSizeFactors(dds)
 vsd <- varianceStabilizingTransformation(dds2, blind=F)
 d.adj <- counts(dds2, normalized=TRUE)
 colnames(d.adj) <- groups
+ids <- rownames(d.adj)
 
 d.summary <- data.frame(unlist(res$log2FoldChange),unlist(res$pvalue), unlist(res$padj), row.names = row.names(res))
 colnames(d.summary) <- c("log2FC", "Pvalue", "PvalueAdj")
