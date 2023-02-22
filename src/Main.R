@@ -215,7 +215,7 @@ dir.create('output/hotnet')
 dir.create('output/hotnet/HotNet_input')
 
 # Get TOM matrix
-TOM <- TOMsimilarityFromExpr(t(d.norm), power=7)
+TOM <- TOMsimilarityFromExpr(t(d.adj), power=2)
 
 # Module labels and log2 values
 moduleColors <- labels2colors(wgcna.net$colors)
