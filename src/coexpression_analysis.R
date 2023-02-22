@@ -231,7 +231,7 @@ GO.terms.modules <- function(coex.net, IDs, log2values, entrez.ids, fig.folder, 
     d.GO <- d.GO[,apply(d.GO, 2, function(x){sum(!is.na(x)) > 0})]
     
     # Create heatmap of clusters
-    plotfile <- paste0(fig.folder, '/GO_heatmap_', i, '_', module, '.png')
+    plotfile <- paste0(fig.folder, '/GO_heatmap_', i, '_', module, '.pdf')
     ylab.size <- max(unlist(lapply(rownames(d.GO), nchar)))/15
     h <- pheatmap(d.GO,
                   cluster_rows=FALSE,

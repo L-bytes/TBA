@@ -1,8 +1,10 @@
-#!/usr/bin/python3.5
+#!/usr/bin/python2.7
 
 # Load modules.
 import math, numpy as np
 import sys, argparse
+import warnings
+warnings.filterwarnings('ignore')
 
 from hierarchical_clustering import tarjan_HD, strongly_connected_components
 from common import combined_similarity_matrix

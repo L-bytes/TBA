@@ -1,6 +1,7 @@
 ####### Main workflow in the paper
 # If you only want to run part of the workflow, you can load the required data from the previous steps as indicated in each section below (load(...))
-
+### Set working directory to scratch on LISA
+argv = commandArgs(trailingOnly=TRUE)
 #######################################
 ###      Load required packages     ###
 #######################################
@@ -9,32 +10,31 @@ library(stringr)
 library(BiocManager)
 library(BioNet)
 library(pheatmap)
-library(WGCNA)
 library(countdata)
 library(DESeq2)
 library('org.Hs.eg.db')
+library(WGCNA)
 library(clusterProfiler)
 options(stringsAsFactors=FALSE)
 # Load required functions from the src directory
-source('src/preprocessing.R')
-source('src/differential_expression.R')
+source(paste(argv[2],'/src/preprocessing.R', sep=""))
+source(paste(argv[2],'/src/differential_expression.R', sep=""))
 #source('src/add_uniprot_info.R')
-source('src/clustering.R')
-source('src/coexpression_analysis.R')
-source('src/validation.R')
+source(paste(argv[2],'/src/clustering.R', sep=""))
+source(paste(argv[2],'/src/coexpression_analysis.R', sep=""))
+source(paste(argv[2],'/src/validation.R', sep=""))
 
 
 #######################################
 ###             Setup               ###
 #######################################
-### Set working directory
-setwd('C:/Users/marle/Desktop/Y2/Internship/Project') #Replace with your working directory
+### Set working directory to scratch on LISA
+setwd(argv[1]) #Replace with your working directory
 
 ### Create output directories
 dir.create('output')
 dir.create('figures')
 dir.create('rdata')
-
 
 ### Load data
 d <- read.table('./data/TCGA_rna_count_data.txt', header=TRUE, sep='\t', quote="", row.names = 1, check.names=FALSE)
@@ -42,7 +42,7 @@ group.data <- read.table('./data/non_silent_mutation_profile_crc.txt', header=TR
 
 # Get only the columns with expression values
 
-d <- d[1800:3600,1:10]
+#d <- d[1800:3600,1:10]
 d <- d[,colnames(d) %in% rownames(group.data)]
 group.data <- group.data[rownames(group.data) %in% colnames(d),]
 
@@ -67,7 +67,7 @@ save(d.raw, group.data, groups, ids, file='rdata/input_data.RData')
 #######################################
 ###         Preprocessing           ###
 #######################################
-load(file='rdata/input_data.rdata')
+#load(file='rdata/input_data.rdata')
 d.norm <- normalize.sample(d.raw)
 d.cs <- normalize.cs(d.norm)
 length <- length(groups)
@@ -97,9 +97,10 @@ dds2 <- estimateSizeFactors(dds)
 vsd <- varianceStabilizingTransformation(dds2, blind=F)
 d.adj <- counts(dds2, normalized=TRUE)
 colnames(d.adj) <- groups
+ids <- rownames(d.adj)
 
-d.summary <- data.frame(unlist(res$log2FoldChange),unlist(res$pvalue), unlist(res$padj), row.names = ids)
-colnames(d.summary) <- c("log2FC", "Pvalue", "PvalueAdj")
+d.summary <- data.frame(unlist(res$log2FoldChange), unlist(res$padj), row.names = row.names(res))
+colnames(d.summary) <- c("log2FC", "Pvalue")
 
 # resLFC <- lfcShrink(dds, coef="KRAS_2_vs_1", type="apeglm")
 # resLFC
@@ -216,7 +217,7 @@ dir.create('output/hotnet')
 dir.create('output/hotnet/HotNet_input')
 
 # Get TOM matrix
-TOM <- TOMsimilarityFromExpr(t(d.norm), power=7)
+TOM <- TOMsimilarityFromExpr(t(d.adj), power=2)
 
 # Module labels and log2 values
 moduleColors <- labels2colors(wgcna.net$colors)
@@ -304,7 +305,8 @@ for (module in modules){
 
 ######### Run hierarchical hotnet to obtain the most significant submodule within each of the identified modules
 ######### Note that the HotNet package was written in Python and needs to be intstalled separately on your machine
-system('bash src/run_hierarchicalHotnet_modules.sh')
+system(paste('bash', paste(argv[2],'/src/run_hierarchicalHotnet_modules.sh', sep="")))
+system('module load R')
 
 #GSEA
 for (module in modules){

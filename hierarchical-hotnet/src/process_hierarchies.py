@@ -1,4 +1,4 @@
-#!/usr/bin/python3.5
+#!/usr/bin/python2.7
 
 # Load modules.
 import numpy as np
