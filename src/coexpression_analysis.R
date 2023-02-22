@@ -41,7 +41,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
   # Create network from chosen value of beta
   rownames(d) <- paste(rownames(d), length(groups), sep='_')
   coex.net <- blockwiseModules(d, power=power,
-                               TOMType="unsigned", minModuleSize=15,
+                               TOMType="unsigned", minModuleSize=30,
                                reassignThreshold=0, mergeCutHeight=0.25,
                                numericLabels=TRUE, pamRespectsDendro=FALSE,
                                saveTOMs=TRUE, saveTOMFileBase="rdata/coexpression_discovery", verbose=3)
