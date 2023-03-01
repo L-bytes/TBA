@@ -27,7 +27,7 @@ mkdir -p $results
 
 ### Set parameters
 modules=(black blue brown cyan green greenyellow grey grey60 lightcyan magenta midnightblue pink purple  red  salmon tan turquoise yellow)
-thresholds=(001 003)
+thresholds=(003)
 methods=(log2)
 num_permutations=100
 : '
