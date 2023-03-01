@@ -26,7 +26,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
   plot(soft.tresh $fitIndices[,1], -sign(soft.tresh $fitIndices[,3])*soft.tresh $fitIndices[,2], xlab="Beta",ylab="Scale Free Topology Model Fit, R^2",type="n", main = paste("Scale independence"))
   text(soft.tresh $fitIndices[,1], -sign(soft.tresh $fitIndices[,3])*soft.tresh $fitIndices[,2], labels=powers,cex=cex1,col="red")
   # this line corresponds to using an R^2 cut-off of h
-  abline(h=0.80,col="red")
+  abline(h=0.90,col="red")
   # Mean connectivity as a function of beta
   plot(soft.tresh $fitIndices[,1], soft.tresh $fitIndices[,5], xlab="Beta", ylab="Mean Connectivity", type="n", main = paste("Mean connectivity"))
   text(soft.tresh $fitIndices[,1], soft.tresh $fitIndices[,5], labels=powers, cex=cex1,col="red")
@@ -35,15 +35,18 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
   if (!power){
     # Pick first value where scale independence is higher than 0.8
     sf.values <- -sign(soft.tresh $fitIndices[,3])*soft.tresh $fitIndices[,2]
-    sf.bool <- sf.values > 0.8
+    sf.values2 <- -sign(soft.tresh $fitIndices[,5])
+    sf.bool <- sf.values > 0.9
+    sf.bool <- sf.bool & (sf.values2 < 150)
     power <- soft.tresh $fitIndices[,1][sf.bool][1]
   }
+  print(power)
   # Create network from chosen value of beta
   rownames(d) <- paste(rownames(d), length(groups), sep='_')
   coex.net <- blockwiseModules(d, power=power,
                                TOMType="unsigned", minModuleSize=30,
                                reassignThreshold=0, mergeCutHeight=0.25,
-                               numericLabels=TRUE, pamRespectsDendro=FALSE,
+                               numericLabels=TRUE, pamRespectsDendro=FALSE, deepSplit = 4,
                                saveTOMs=TRUE, saveTOMFileBase="rdata/coexpression_discovery", verbose=3)
   # Merge M18 (lightgreen) into M9 (magenta), since they were highly similar
   # coex.net$colors <- replace(coex.net$colors, coex.net$colors==18, 9)
@@ -90,7 +93,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
   }
   write.table(pval.modules.adj, file=paste0(outfolder, '/sign_log2fc_modules.tsv'), sep='\t',
               row.names=TRUE, col.names=TRUE, quote=FALSE)
-  return(list(coex.net, pval.modules.adj))
+  return(list(coex.net, pval.modules.adj, power))
 }
 
 #' GO term enrichment analysis of the modules identified by WGCNA

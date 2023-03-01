@@ -93,14 +93,23 @@ results.names
 colnames(d.raw) <- groups
 
 #Normalization
+#Normalization
 dds2 <- estimateSizeFactors(dds)
 vsd <- varianceStabilizingTransformation(dds2, blind=F)
 d.adj <- counts(dds2, normalized=TRUE)
 colnames(d.adj) <- groups
-ids <- rownames(d.adj)
 
-d.summary <- data.frame(unlist(res$log2FoldChange), unlist(res$padj), row.names = row.names(res))
+if (any(is.na(d.adj))){
+  print("NA present")
+}
+
+d.summary <- data.frame(unlist(res$log2FoldChange), unlist(res$padj), row.names = rownames(res))
 colnames(d.summary) <- c("log2FC", "Pvalue")
+
+d.summary <- na.omit(d.summary)
+
+d.adj <- d.adj[rownames(d.adj) %in% rownames(d.summary),]
+ids <- rownames(d.adj)
 
 # resLFC <- lfcShrink(dds, coef="KRAS_2_vs_1", type="apeglm")
 # resLFC
@@ -192,15 +201,58 @@ colnames(d.log2vals) <- c('log2FC')
 coexpression <- coexpression.analysis(t(d.adj), d.log2vals, 'output/coexpression', 'figures/coexpression')
 wgcna.net <- coexpression[[1]]
 module.significance <- coexpression[[2]]
+power <- coexpression[[3]]
 # Merge M18 (lightgreen) into M9 (magenta), since they were highly similar
 #wgcna.net$colors <- replace(wgcna.net$colors, wgcna.net$colors==18, 9)
 log2vals <- d.summary$log2FC
 names(log2vals) <- ids
 gns<-mapIds(org.Hs.eg.db, keys = ids, column = "ENTREZID", keytype = "SYMBOL")
-GOenr.net <- GO.terms.modules(wgcna.net, ids, log2vals, gns, 'figures/coexpression', 'output/coexpression')
+#GOenr.net <- GO.terms.modules(wgcna.net, ids, log2vals, gns, 'figures/coexpression', 'output/coexpression')
 
 # Save data structures
-save(wgcna.net, GOenr.net, module.significance, ids, file='rdata/coexpression.RData')
+#save(wgcna.net, GOenr.net, module.significance, ids, file='rdata/coexpression.RData')
+
+### PLOTS
+#adjMat <- adjacency(d.adj,
+#          type = "unsigned", 
+#          power = 3,
+#          distFnc = "dist", distOptions = "method = 'euclidean'")
+#          
+#dissim <- TOMdist(
+#    adjMat,
+#    TOMType = "unsigned",
+#    TOMDenom = "min",
+#    suppressTOMForZeroAdjacencies = FALSE,
+#    suppressNegativeTOM = FALSE,
+#    useInternalMatrixAlgebra = FALSE,
+#    verbose = 1,
+#    indent = 0)
+#    
+#TOMplot <- TOMplot(
+#   dissim, 
+#   wgcna.net$dendrograms[[1]],
+#   terrainColors = FALSE, 
+#   setLayout = TRUE)
+#   
+#networkHeatmap <- plotNetworkHeatmap(
+#  d.adj, 
+#  ids,
+#  useTOM = TRUE, 
+#  power = 2, 
+#  networkType = "unsigned", 
+#  main = "Heatmap of the network")
+#
+#moduleSignificance <- plotModuleSignificance(
+#    d.summary$Pvalue
+#    labels2colors(wgcna.net$colors), 
+#    boxplot = FALSE, 
+#    main = "Gene significance across modules,", 
+#    ylab = "Gene Significance")
+#
+#MEpairs <-  plotMEpairs(
+#     d.adj,
+#     main = "Relationship between module eigengenes", 
+#     clusterMEs = TRUE)
 
 #######################################
 ###       Hierarchical HotNet       ###
@@ -217,7 +269,7 @@ dir.create('output/hotnet')
 dir.create('output/hotnet/HotNet_input')
 
 # Get TOM matrix
-TOM <- TOMsimilarityFromExpr(t(d.adj), power=2)
+TOM <- TOMsimilarityFromExpr(t(d.adj), power=power)
 
 # Module labels and log2 values
 moduleColors <- labels2colors(wgcna.net$colors)
