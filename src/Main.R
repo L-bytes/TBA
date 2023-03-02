@@ -464,12 +464,18 @@ system(paste0('bash src/run_hierarchicalHotnet_modules.sh "', paste(modules, col
 print(Sys.time())
 #GSEA
 for (module in modules){
+  print(module)
   #Read in genes
-  inSubnetwork <- as.vector(t(read.csv(paste('output/hotnet/HotNet_results/consensus_nodes_log2_003_', module, '.tsv', sep=''), sep='\t', header = FALSE)[1,]))
-  log2Subnetwork <- log2.SNV.WT[inSubnetwork]
-  geneList <- log2Subnetwork
-  PSubnetwork <- P.SNV.WT[inSubnetwork]
-  gsea <- enrichGO(geneList=inSubnetwork, ont="BP", keyType = "SYMBOL", pvalueCutoff = 0.05, OrgDb=org.Hs.eg.db)
+  if (file.info(paste('output/hotnet/HotNet_results/consensus_nodes_log2_003_', module, '.tsv', sep=''))$size == 0){
+    next
+  }
+  else {
+    inSubnetwork <- as.vector(t(read.csv(paste('output/hotnet/HotNet_results/consensus_nodes_log2_003_', module, '.tsv', sep=''), sep='\t', header = FALSE)[1,]))
+    log2Subnetwork <- log2.SNV.WT[inSubnetwork]
+    geneList <- log2Subnetwork
+    PSubnetwork <- P.SNV.WT[inSubnetwork]
+    gsea <- enrichGO(inSubnetwork, ont="BP", keyType = "SYMBOL", pvalueCutoff = 0.05, OrgDb=org.Hs.eg.db)
+  }
 }
 
 #######################################
