@@ -12,6 +12,10 @@ library(pheatmap)
 library(countdata)
 library(DESeq2)
 library('org.Hs.eg.db')
+library(clusterProfiler)
+library(ggplot2)
+library(pheatmap)
+library(RColorBrewer)
 library(WGCNA)
 options(stringsAsFactors=FALSE)
 # Load required functions from the src directory
@@ -34,7 +38,7 @@ dir.create('output')
 dir.create('figures')
 dir.create('rdata')
 
-
+print(Sys.time())
 ### Load data
 d <- read.table('./data/TCGA_rna_count_data.txt', header=TRUE, sep='\t', quote="", row.names = 1, check.names=FALSE)
 group.data <- read.table('./data/non_silent_mutation_profile_crc.txt', header=TRUE, sep='\t', quote="", row.names = 1, check.names=FALSE)
@@ -59,20 +63,25 @@ groups <- group.data$KRAS
 # colnames(d.raw) <- groups
 count.groups <- d.raw
 colnames(count.groups) <- groups
+print(Sys.time())
 # Save input data
 save(d.raw, group.data, groups, ids, file='rdata/input_data.RData')
 
+png(file=paste0('figures/sampleCluster.png'), width=960, height=480)
 plotClusterTreeSamples(t(d.raw), group.KRAS)
+dev.off()
 
+png(file=paste0('figures/meanExpression.png'), width=960, height=480)
 barplot(apply(t(d.raw),1,mean, na.rm=T),
         xlab = "Sample", ylab = "Mean expression",
         main ="Mean expression across samples")
-
+dev.off()
 
 #######################################
 ###         Preprocessing           ###
 #######################################
 load(file='rdata/input_data.rdata')
+dir.create('figures/differential expression')
 d.norm <- normalize.sample(d.raw)
 d.cs <- normalize.cs(d.norm)
 length <- length(groups)
@@ -80,7 +89,7 @@ length <- length(groups)
 colnames(d.cs) <- paste(groups, 1:length, sep='_')
 # save input data into a file
 save(d.norm, d.cs, ids, groups, file='rdata/normalized_data.rdata')
-
+print(Sys.time())
 #DE-SEQ
 group.KRAS <- as.matrix(group.data[,"KRAS"])
 rownames(group.KRAS) <- rownames(group.data)
@@ -114,69 +123,88 @@ d.summary <- na.omit(d.summary)
 
 d.adj <- d.adj[rownames(d.adj) %in% rownames(d.summary),]
 ids <- rownames(d.adj)
+print(Sys.time())
 
+png(file=paste0('figures/differential expression/clusterSamples.png'), width=960, height=480)
 plotClusterTreeSamples(t(d.adj), group.KRAS)
+dev.off()
 
+png(file=paste0('figures/differential expression/meanExpression.png'), width=960, height=480)
 barplot(apply(t(d.adj),1,mean, na.rm=T),
         xlab = "Sample", ylab = "Mean expression",
         main ="Mean expression across samples")
-
+dev.off()
 
 # resLFC <- lfcShrink(dds, coef="KRAS_2_vs_1", type="apeglm")
 # resLFC
 
 #Some plots
-ddsTransform <- normTransform(dds)
-
+png(file=paste0('figures/differential expression/MA.png'), width=960, height=480)
 plotMA(res, ylim=c(-2,2))
+dev.off()
 
+png(file=paste0('figures/differential expression/counts.png'), width=960, height=480)
 plotCounts(dds, gene=which.min(res$padj), intgroup="KRAS")
+dev.off()
 
-library("pheatmap")
+
 select <- order(rowMeans(counts(dds,normalized=TRUE)),
                 decreasing=TRUE)
 df <- as.data.frame(colData(dds)[,c("KRAS")])
 rownames(df) <- colnames(assay(dds)[select,])
+png(file=paste0('figures/differential expression/heatmap.png'), width=960, height=480)
 pheatmap(assay(dds)[select,], breaks=seq(0,max(d.adj), by = 350), cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, annotation_col=df)
+dev.off()
 
-library("RColorBrewer")
+
 sampleDists <- dist(t(assay(dds)))
 sampleDistMatrix <- as.matrix(sampleDists)
 rownames(sampleDistMatrix) <- paste(dds$KRAS, sep="-")
 colnames(sampleDistMatrix) <- paste(dds$KRAS, sep="-")
 colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+png(file=paste0('figures/differential expression/sampleDistances.png'), width=960, height=480)
 pheatmap(sampleDistMatrix,
          clustering_distance_rows=sampleDists,
          clustering_distance_cols=sampleDists,
          col=colors)
+dev.off()
 
+png(file=paste0('figures/differential expression/dispersion.png'), width=960, height=480)
 plotDispEsts(dds)
+dev.off()
 
+png(file=paste0('figures/differential expression/rejections.png'), width=960, height=480)
 plot(metadata(res)$filterNumRej, 
      type="b", ylab="number of rejections",
      xlab="quantiles of filter")
 lines(metadata(res)$lo.fit, col="red")
 abline(v=metadata(res)$filterTheta)
+dev.off()
+
 
 W <- res$stat
 maxCooks <- apply(assays(dds)[["cooks"]],1,max)
 idx <- !is.na(W)
+png(file=paste0('figures/differential expression/Wald.png'), width=960, height=480)
 plot(rank(W[idx]), maxCooks[idx], xlab="rank of Wald statistic", 
      ylab="maximum Cook's distance per gene",
      ylim=c(0,5), cex=.4, col=rgb(0,0,0,.3))
 m <- ncol(dds)
 p <- 3
 abline(h=qf(.99, p, m - p))
+dev.off()
 
 use <- res$baseMean > metadata(res)$filterThreshold
 h1 <- hist(res$pvalue[!use], breaks=0:50/50, plot=FALSE)
 h2 <- hist(res$pvalue[use], breaks=0:50/50, plot=FALSE)
 colori <- c(`do not pass`="khaki", `pass`="powderblue")
+png(file=paste0('figures/differential expression/pass.png'), width=960, height=480)
 barplot(height = rbind(h1$counts, h2$counts), beside = FALSE,
           col = colori, space = 0, main = "", ylab="frequency")
 text(x = c(0, length(h1$counts)), y = 0, label = paste(c(0,1)),
      adj = c(0.5,1.7), xpd=NA)
 legend("topright", fill=rev(colori), legend=rev(names(colori)))
+dev.off()
 
 #######################################
 ### Differential expression analysis###
@@ -243,13 +271,14 @@ legend("topright", fill=rev(colori), legend=rev(names(colori)))
 #source('src/coexpression_analysis_prep.R')
 dir.create('figures/coexpression')
 dir.create('output/coexpression')
-
+print(Sys.time())
 d.log2vals <- as.data.frame(d.summary[, c('log2FC')], row.names=row.names(d.summary))
 colnames(d.log2vals) <- c('log2FC')
 coexpression <- coexpression.analysis(t(d.adj), d.log2vals, 'output/coexpression', 'figures/coexpression')
 wgcna.net <- coexpression[[1]]
 module.significance <- coexpression[[2]]
 power <- coexpression[[3]]
+print(Sys.time())
 # Merge M18 (lightgreen) into M9 (magenta), since they were highly similar
 #wgcna.net$colors <- replace(wgcna.net$colors, wgcna.net$colors==18, 9)
 log2vals <- d.summary$log2FC
@@ -269,41 +298,53 @@ restGenes <- (colorDynamicTOM != "grey")
 diss2 <- 1 - TOMsimilarityFromExpr(t(d.adj[restGenes,]), power = power)
 hier2 <- hclust(as.dist(diss2), method="average" )
 diag(diss2) = NA;
-TOMplot <- TOMplot(diss2^4, hier2, main = "TOM heatmap plot, module genes", terrainColors = FALSE)
 
-networkHeatmap <- plotNetworkHeatmap(
+png(file=paste0('figures/coexpression/TOMheatmap.png'), width=960, height=480)
+TOMplot(diss2^4, hier2, main = "TOM heatmap plot, module genes", terrainColors = FALSE)
+dev.off()
+
+png(file=paste0('figures/coexpression/networkHeatmap.png'), width=960, height=480)
+plotNetworkHeatmap(
  t(d.adj),
  ids,
  useTOM = TRUE,
  power = power,
  networkType = "unsigned",
  main = "Heatmap of the network")
+dev.off()
 
-moduleSignificance <- plotModuleSignificance(
+png(file=paste0('figures/coexpression/moduleSignificance.png'), width=960, height=480)
+plotModuleSignificance(
   d.summary$Pvalue,
   labels2colors(wgcna.net$colors),
   boxplot = FALSE,
   main = "Gene significance across modules,",
   ylab = "Gene Significance")
-
+dev.off()
 
 datME <- moduleEigengenes(t(d.adj),colorDynamicTOM)$eigengenes
 signif(cor(datME, use="p"), 2)
 dissimME <- (1-t(cor(datME, method="p")))/2
 hclustdatME <- hclust(as.dist(dissimME), method="average" )
 # Plot the eigengene dendrogram
+png(file=paste0('figures/coexpression/moduleEigengenes.png'), width=960, height=480)
 par(mfrow=c(1,1))
 plot(hclustdatME, main="Clustering tree based of the module eigengenes")
+dev.off()
 
+png(file=paste0('figures/coexpression/MEpairs.png'), width=960, height=480)
 MEpairs <- plotMEpairs(
   datME,
   main = "Relationship between module eigengenes",
   clusterMEs = TRUE)
+dev.off
 
 GS1 <- as.numeric(cor(group.KRAS,t(d.adj), use="p"))
 GeneSignificance <- abs(GS1)
 ModuleSignificance <- tapply(GeneSignificance, colorDynamicTOM, mean, na.rm=T)
+png(file=paste0('figures/coexpression/moduleSignificance.png'), width=960, height=480)
 plotModuleSignificance(GeneSignificance,colorDynamicTOM)
+dev.off()
 
 #######################################
 ###       Hierarchical HotNet       ###
@@ -328,19 +369,19 @@ P.SNV.WT <- d.summary$Pvalue
 # Get table with interactions for each module
 for (module in modules){
   print(module)
-  plotMat <- plotMat(t(scale(t(d.adj[colorDynamicTOM==module,]))),rlabels=T,
+  print(Sys.time())
+  png(file=paste0('figures/coexpression/module_matrix.png'), width=960, height=480)
+  plotMat(t(scale(t(d.adj[colorDynamicTOM==module,]))),rlabels=T,
           clabels=T,rcols=module,
-          title=which.module)
+          title=module)
+  dev.off()
   
   ME=datME[, paste("ME",module, sep="")]
-  par(mfrow=c(2,1), mar=c(0.3, 5.5, 3, 2))
-  plotMat(t(scale(t(d.adj[colorDynamicTOM==module,]))),
-          rlabels=F,rcols=module,
-          main=module, cex.main=2)
   par(mar=c(5, 4.2, 0, 0.7))
+  png(file=paste0('figures/coexpression/module_ME.png'), width=960, height=480)
   barplot(ME, col=module, main="", cex.main=2,
           ylab="eigengene expression",xlab="array sample")
-  
+  dev.off()
   
   # Select proteins in module
   inModule <- moduleColors == module
@@ -376,7 +417,6 @@ for (module in modules){
   edges.matrix.2.num <- data.frame(matrix(nrow=0, ncol=2))
   i2g.1 <- data.frame(matrix(nrow=0, ncol=2))
   i2g.2 <- data.frame(matrix(nrow=0, ncol=2))
-  Sys.time()
   # Write tables: one with edges between all nodes, one with a treshold of 0.05 and one with custom thresholds
   for (i in 1:(nrow(TOMmodule)-1)){
     #print(i)
@@ -407,29 +447,29 @@ for (module in modules){
       }
     }
   }
-  Sys.time()
   write.table(edges.matrix.1, file=paste0('output/hotnet/HotNet_input/name_edges_expression_003_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
   write.table(edges.matrix.2, file=paste0('output/hotnet/HotNet_input/name_edges_expression_001_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
   write.table(edges.matrix.1.num, file=paste0('output/hotnet/HotNet_input/edge_list_003_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
   write.table(edges.matrix.2.num, file=paste0('output/hotnet/HotNet_input/edge_list_001_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
   write.table(i2g.1, file=paste0('output/hotnet/HotNet_input/i2g_003_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
   write.table(i2g.2, file=paste0('output/hotnet/HotNet_input/i2g_001_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+  print(Sys.time())
 }
 
 
 ######### Run hierarchical hotnet to obtain the most significant submodule within each of the identified modules
 ######### Note that the HotNet package was written in Python and needs to be intstalled separately on your machine
-system('bash src/run_hierarchicalHotnet_modules.sh')
-
+print(Sys.time())
+system(paste0('bash src/run_hierarchicalHotnet_modules.sh "', paste(modules, collapse=' '), '"'))
+print(Sys.time())
 #GSEA
 for (module in modules){
   #Read in genes
-  inSubnetwork <- read.csv(paste('/output/hotnet/HotNet_results/consensus_nodes_log2_003_', module, sep=''), sep='/')
-  idsSubnetwork<- ids[inSubnetwork]
+  inSubnetwork <- as.vector(t(read.csv(paste('output/hotnet/HotNet_results/consensus_nodes_log2_003_', module, '.tsv', sep=''), sep='\t', header = FALSE)[1,]))
   log2Subnetwork <- log2.SNV.WT[inSubnetwork]
   geneList <- log2Subnetwork
   PSubnetwork <- P.SNV.WT[inSubnetwork]
-  gsea <- gseGO(geneList=inSubnetwork, ont="BP", keyType = "SYMBOL", pvalueCutoff = 0.05, OrgDb=org.Hs.eg.db)
+  gsea <- enrichGO(geneList=inSubnetwork, ont="BP", keyType = "SYMBOL", pvalueCutoff = 0.05, OrgDb=org.Hs.eg.db)
 }
 
 #######################################
