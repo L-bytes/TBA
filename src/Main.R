@@ -15,6 +15,7 @@ library('org.Hs.eg.db')
 library(clusterProfiler)
 library(ggplot2)
 library(pheatmap)
+library(enrichplot)
 library(RColorBrewer)
 library(WGCNA)
 options(stringsAsFactors=FALSE)
@@ -42,10 +43,10 @@ print(Sys.time())
 ### Load data
 d <- read.table('./data/TCGA_rna_count_data.txt', header=TRUE, sep='\t', quote="", row.names = 1, check.names=FALSE)
 group.data <- read.table('./data/non_silent_mutation_profile_crc.txt', header=TRUE, sep='\t', quote="", row.names = 1, check.names=FALSE)
-
+print(Sys.time())
 # Get only the columns with expression values
 
-d <- d[1800:3600,1:10]
+# <- d[1:5000,1:50]
 d <- d[,colnames(d) %in% rownames(group.data)]
 group.data <- group.data[rownames(group.data) %in% colnames(d),]
 
@@ -67,11 +68,11 @@ print(Sys.time())
 # Save input data
 save(d.raw, group.data, groups, ids, file='rdata/input_data.RData')
 
-png(file=paste0('figures/sampleCluster.png'), width=960, height=480)
-plotClusterTreeSamples(t(d.raw), group.KRAS)
+png(file=paste0('figures/sampleCluster.png'), width=1920, height=1020)
+plotClusterTreeSamples(t(d.raw), groups)
 dev.off()
 
-png(file=paste0('figures/meanExpression.png'), width=960, height=480)
+png(file=paste0('figures/meanExpression.png'), width=1920, height=1020)
 barplot(apply(t(d.raw),1,mean, na.rm=T),
         xlab = "Sample", ylab = "Mean expression",
         main ="Mean expression across samples")
@@ -80,7 +81,7 @@ dev.off()
 #######################################
 ###         Preprocessing           ###
 #######################################
-load(file='rdata/input_data.rdata')
+#load(file='rdata/input_data.rdata')
 dir.create('figures/differential expression')
 d.norm <- normalize.sample(d.raw)
 d.cs <- normalize.cs(d.norm)
@@ -89,6 +90,7 @@ length <- length(groups)
 colnames(d.cs) <- paste(groups, 1:length, sep='_')
 # save input data into a file
 save(d.norm, d.cs, ids, groups, file='rdata/normalized_data.rdata')
+
 print(Sys.time())
 #DE-SEQ
 group.KRAS <- as.matrix(group.data[,"KRAS"])
@@ -111,6 +113,7 @@ dds2 <- estimateSizeFactors(dds)
 vsd <- varianceStabilizingTransformation(dds2, blind=F)
 d.adj <- counts(dds2, normalized=TRUE)
 colnames(d.adj) <- groups
+print(Sys.time())
 
 if (any(is.na(d.adj))){
   print("NA present")
@@ -125,11 +128,11 @@ d.adj <- d.adj[rownames(d.adj) %in% rownames(d.summary),]
 ids <- rownames(d.adj)
 print(Sys.time())
 
-png(file=paste0('figures/differential expression/clusterSamples.png'), width=960, height=480)
+png(file=paste0('figures/differential expression/clusterSamples.png'), width=1920, height=1020)
 plotClusterTreeSamples(t(d.adj), group.KRAS)
 dev.off()
 
-png(file=paste0('figures/differential expression/meanExpression.png'), width=960, height=480)
+png(file=paste0('figures/differential expression/meanExpression.png'), width=1920, height=1020)
 barplot(apply(t(d.adj),1,mean, na.rm=T),
         xlab = "Sample", ylab = "Mean expression",
         main ="Mean expression across samples")
@@ -139,11 +142,11 @@ dev.off()
 # resLFC
 
 #Some plots
-png(file=paste0('figures/differential expression/MA.png'), width=960, height=480)
+png(file=paste0('figures/differential expression/MA.png'), width=1920, height=1020)
 plotMA(res, ylim=c(-2,2))
 dev.off()
 
-png(file=paste0('figures/differential expression/counts.png'), width=960, height=480)
+png(file=paste0('figures/differential expression/counts.png'), width=1920, height=1020)
 plotCounts(dds, gene=which.min(res$padj), intgroup="KRAS")
 dev.off()
 
@@ -152,8 +155,8 @@ select <- order(rowMeans(counts(dds,normalized=TRUE)),
                 decreasing=TRUE)
 df <- as.data.frame(colData(dds)[,c("KRAS")])
 rownames(df) <- colnames(assay(dds)[select,])
-png(file=paste0('figures/differential expression/heatmap.png'), width=960, height=480)
-pheatmap(assay(dds)[select,], breaks=seq(0,max(d.adj), by = 350), cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, annotation_col=df)
+png(file=paste0('figures/differential expression/heatmap.png'), width=1920, height=1020)
+pheatmap(assay(dds)[select,], cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, annotation_col=df)
 dev.off()
 
 
@@ -162,19 +165,19 @@ sampleDistMatrix <- as.matrix(sampleDists)
 rownames(sampleDistMatrix) <- paste(dds$KRAS, sep="-")
 colnames(sampleDistMatrix) <- paste(dds$KRAS, sep="-")
 colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
-png(file=paste0('figures/differential expression/sampleDistances.png'), width=960, height=480)
+png(file=paste0('figures/differential expression/sampleDistances.png'), width=1920, height=1020)
 pheatmap(sampleDistMatrix,
          clustering_distance_rows=sampleDists,
          clustering_distance_cols=sampleDists,
          col=colors)
 dev.off()
 
-png(file=paste0('figures/differential expression/dispersion.png'), width=960, height=480)
+png(file=paste0('figures/differential expression/dispersion.png'), width=1920, height=1020)
 plotDispEsts(dds)
 dev.off()
 
-png(file=paste0('figures/differential expression/rejections.png'), width=960, height=480)
-plot(metadata(res)$filterNumRej, 
+png(file=paste0('figures/differential expression/rejections.png'), width=1920, height=1020)
+plot(metadata(res)$filterNumRej,
      type="b", ylab="number of rejections",
      xlab="quantiles of filter")
 lines(metadata(res)$lo.fit, col="red")
@@ -185,8 +188,8 @@ dev.off()
 W <- res$stat
 maxCooks <- apply(assays(dds)[["cooks"]],1,max)
 idx <- !is.na(W)
-png(file=paste0('figures/differential expression/Wald.png'), width=960, height=480)
-plot(rank(W[idx]), maxCooks[idx], xlab="rank of Wald statistic", 
+png(file=paste0('figures/differential expression/Wald.png'), width=1920, height=1020)
+plot(rank(W[idx]), maxCooks[idx], xlab="rank of Wald statistic",
      ylab="maximum Cook's distance per gene",
      ylim=c(0,5), cex=.4, col=rgb(0,0,0,.3))
 m <- ncol(dds)
@@ -198,7 +201,7 @@ use <- res$baseMean > metadata(res)$filterThreshold
 h1 <- hist(res$pvalue[!use], breaks=0:50/50, plot=FALSE)
 h2 <- hist(res$pvalue[use], breaks=0:50/50, plot=FALSE)
 colori <- c(`do not pass`="khaki", `pass`="powderblue")
-png(file=paste0('figures/differential expression/pass.png'), width=960, height=480)
+png(file=paste0('figures/differential expression/pass.png'), width=1920, height=1020)
 barplot(height = rbind(h1$counts, h2$counts), beside = FALSE,
           col = colori, space = 0, main = "", ylab="frequency")
 text(x = c(0, length(h1$counts)), y = 0, label = paste(c(0,1)),
@@ -213,7 +216,9 @@ dev.off()
 # load(file='rdata/normalized_data.RData')
 # dir.create('output/differential_expression')
 # # Beta binomial test
+# print(Sys.time())
 # bb <- betaBinomial(d.norm, ids, groups, 'WT', 'SNV', 'two.sided')
+# print(Sys.time())
 # d.sign <- data.frame(log2FC=bb$table[ids,]$Log2ratio, Pvalue=bb$table[ids,]$Pvalue)
 # rownames(d.sign) <- ids
 # # Merge stats about P-value thresholds and number of significant proteins
@@ -283,10 +288,12 @@ print(Sys.time())
 #wgcna.net$colors <- replace(wgcna.net$colors, wgcna.net$colors==18, 9)
 log2vals <- d.summary$log2FC
 names(log2vals) <- ids
+pvals <- d.summary$Pvalue
+names(pvals) <- ids
 gns<-mapIds(org.Hs.eg.db, keys = ids, column = "ENTREZID", keytype = "SYMBOL")
-#GOenr.net <- GO.terms.modules(wgcna.net, ids, log2vals, gns, 'figures/coexpression', 'output/coexpression')
+# GOenr.net <- GO.terms.modules(wgcna.net, ids, log2vals, gns, 'figures/coexpression', 'output/coexpression')
 # Save data structures
-#save(wgcna.net, GOenr.net, module.significance, ids, file='rdata/coexpression.RData')
+# save(wgcna.net, GOenr.net, module.significance, ids, file='rdata/coexpression.RData')
 
 ### PLOTS
 # Get TOM matrix
@@ -299,11 +306,11 @@ diss2 <- 1 - TOMsimilarityFromExpr(t(d.adj[restGenes,]), power = power)
 hier2 <- hclust(as.dist(diss2), method="average" )
 diag(diss2) = NA;
 
-png(file=paste0('figures/coexpression/TOMheatmap.png'), width=960, height=480)
+png(file=paste0('figures/coexpression/TOMheatmap.png'), width=1920, height=1020)
 TOMplot(diss2^4, hier2, main = "TOM heatmap plot, module genes", terrainColors = FALSE)
 dev.off()
 
-png(file=paste0('figures/coexpression/networkHeatmap.png'), width=960, height=480)
+png(file=paste0('figures/coexpression/networkHeatmap.png'), width=1920, height=1020)
 plotNetworkHeatmap(
  t(d.adj),
  ids,
@@ -313,7 +320,7 @@ plotNetworkHeatmap(
  main = "Heatmap of the network")
 dev.off()
 
-png(file=paste0('figures/coexpression/moduleSignificance.png'), width=960, height=480)
+png(file=paste0('figures/coexpression/moduleSignificance.png'), width=1920, height=1020)
 plotModuleSignificance(
   d.summary$Pvalue,
   labels2colors(wgcna.net$colors),
@@ -327,22 +334,22 @@ signif(cor(datME, use="p"), 2)
 dissimME <- (1-t(cor(datME, method="p")))/2
 hclustdatME <- hclust(as.dist(dissimME), method="average" )
 # Plot the eigengene dendrogram
-png(file=paste0('figures/coexpression/moduleEigengenes.png'), width=960, height=480)
+png(file=paste0('figures/coexpression/moduleEigengenes.png'), width=1920, height=1020)
 par(mfrow=c(1,1))
 plot(hclustdatME, main="Clustering tree based of the module eigengenes")
 dev.off()
 
-png(file=paste0('figures/coexpression/MEpairs.png'), width=960, height=480)
+png(file=paste0('figures/coexpression/MEpairs.png'), width=1920, height=1020)
 MEpairs <- plotMEpairs(
   datME,
   main = "Relationship between module eigengenes",
   clusterMEs = TRUE)
-dev.off
+dev.off()
 
 GS1 <- as.numeric(cor(group.KRAS,t(d.adj), use="p"))
 GeneSignificance <- abs(GS1)
 ModuleSignificance <- tapply(GeneSignificance, colorDynamicTOM, mean, na.rm=T)
-png(file=paste0('figures/coexpression/moduleSignificance.png'), width=960, height=480)
+png(file=paste0('figures/coexpression/moduleSignificance.png'), width=1920, height=1020)
 plotModuleSignificance(GeneSignificance,colorDynamicTOM)
 dev.off()
 
@@ -370,7 +377,7 @@ P.SNV.WT <- d.summary$Pvalue
 for (module in modules){
   print(module)
   print(Sys.time())
-  png(file=paste0('figures/coexpression/module_matrix.png'), width=960, height=480)
+  png(file=paste0('figures/coexpression/module_matrix.png'), width=1920, height=1020)
   plotMat(t(scale(t(d.adj[colorDynamicTOM==module,]))),rlabels=T,
           clabels=T,rcols=module,
           title=module)
@@ -378,7 +385,7 @@ for (module in modules){
   
   ME=datME[, paste("ME",module, sep="")]
   par(mar=c(5, 4.2, 0, 0.7))
-  png(file=paste0('figures/coexpression/module_ME.png'), width=960, height=480)
+  png(file=paste0('figures/coexpression/module_ME.png'), width=1920, height=1020)
   barplot(ME, col=module, main="", cex.main=2,
           ylab="eigengene expression",xlab="array sample")
   dev.off()
@@ -462,22 +469,34 @@ for (module in modules){
 print(Sys.time())
 system(paste0('bash src/run_hierarchicalHotnet_modules.sh "', paste(modules, collapse=' '), '"'))
 print(Sys.time())
+
 #GSEA
 for (module in modules){
   print(module)
-  #Read in genes
-  if (file.info(paste('output/hotnet/HotNet_results/consensus_nodes_log2_003_', module, '.tsv', sep=''))$size == 0){
-    next
-  }
-  else {
-    inSubnetwork <- as.vector(t(read.csv(paste('output/hotnet/HotNet_results/consensus_nodes_log2_003_', module, '.tsv', sep=''), sep='\t', header = FALSE)[1,]))
-    log2Subnetwork <- log2.SNV.WT[inSubnetwork]
-    geneList <- log2Subnetwork
-    PSubnetwork <- P.SNV.WT[inSubnetwork]
-    gsea <- enrichGO(inSubnetwork, ont="BP", keyType = "SYMBOL", pvalueCutoff = 0.05, OrgDb=org.Hs.eg.db)
+  if (module == "grey"){
+      next
+  } else{
+    #Read in genes
+    if (file.info(paste('output/hotnet/HotNet_results/consensus_nodes_log2_003_', module, '.tsv', sep=''))$size == 0){
+      next
+    }
+    else {
+      inSubnetwork <- as.vector(t(read.csv(paste('output/hotnet/HotNet_results/consensus_nodes_log2_003_', module, '.tsv', sep=''), sep='\t', header = FALSE)[1,]))
+      log2Subnetwork <- log2vals[inSubnetwork]
+      PSubnetwork <- pvals[inSubnetwork]
+      geneNames <- mapIds(org.Hs.eg.db, keys = inSubnetwork, column = "ENTREZID", keytype = "SYMBOL")
+      if (is.null(geneNames)){
+        next
+      } else {
+        gsea <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
+        print(barplot(gsea, showCategory=10))
+        dev.copy(png, paste0('figures/coexpression/GO_', module, '.png'), width=1920, height=1020)
+        dev.off()
+      }
+    }
   }
 }
-
+print(Sys.time())
 #######################################
 ###          Validation             ###
 #######################################

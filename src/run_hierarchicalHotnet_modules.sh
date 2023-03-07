@@ -27,6 +27,7 @@ mkdir -p $results
 
 ### Set parameters
 modules=($1)
+echo ${modules[@]}
 thresholds=(003)
 methods=(log2)
 num_permutations=100
