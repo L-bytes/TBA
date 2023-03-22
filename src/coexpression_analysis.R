@@ -43,22 +43,25 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
   print(power)
   # Create network from chosen value of beta
   rownames(d) <- paste(rownames(d), length(groups), sep='_')
+  allowWGCNAThreads(nThreads = NULL)
+  enableWGCNAThreads(nThreads = NULL)
+  print(WGCNAnThreads())
   coex.net <- blockwiseModules(d, power=power,
                                TOMType="unsigned", minModuleSize=30,
                                reassignThreshold=0, mergeCutHeight=0.25,
                                numericLabels=TRUE, pamRespectsDendro=FALSE, deepSplit = 4,
-                               saveTOMs=TRUE, saveTOMFileBase="rdata/coexpression_discovery", verbose=3)
+                               saveTOMs=TRUE, saveTOMFileBase="rdata/coexpression_discovery", verbose=3, maxBlockSize=nrow(d.summary))
   # Merge M18 (lightgreen) into M9 (magenta), since they were highly similar
   # coex.net$colors <- replace(coex.net$colors, coex.net$colors==18, 9)
   # Plot modules and gene hierarchical clustering
   moduleColors <- labels2colors(coex.net$colors)
   modules <- levels(as.factor(moduleColors))
   n.modules <- length(modules)
-
+  
   png(file=paste0(figfolder, '/module_dendrogram.png'), width=960, height=480)
-  plotDendroAndColors(coex.net$dendrograms[[1]], moduleColors[coex.net$blockGenes[[1]]],
-                      "Module colors", dendroLabels=FALSE, hang=0.03, addGuide=TRUE, guideHang=0.05)#,
-                      #abHeight=0.85, abCol='red')
+  plotDendroAndColors(coex.net$dendrograms[[1]], moduleColors,
+                      "Module colors", dendroLabels=FALSE, hang=0.03, addGuide=TRUE, guideHang=0.05, cex.lab = 2, cex.axis = 2, cex.main = 2)#,
+  #abHeight=0.85, abCol='red')
   dev.off()
   # Plot distribution of eigengene expression values for each module, and calculate significance of differential expression within the modules
   MEs <- coex.net$MEs
@@ -76,7 +79,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
     # Plot module eigengene expression
     png(paste0(figfolder, '/ME_distribution_', i, '_', module, '.png'))
     boxplot(ME.SNV[,paste0('ME', i)], ME.WT[,paste0('ME', i)], names=c('SNV', 'WT'),
-            col=module, xlab='group', ylab='ME value')
+            col=module, xlab='group', ylab='ME value', cex.lab = 2, cex.axis = 2, cex.main = 2)
     dev.off()
     # Calculate if distribution of log2FC values between the groups are significantly different from zero in each module
     #pval.modules <- data.frame()
@@ -84,7 +87,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
     t.stat <- t.test(logvals)
     pvals.modules[module] <- t.stat$p.value
     print(c(module, median(logvals), sd(logvals), length(logvals)))
-    }
+  }
   # Multiple testing correction
   p.adj <- p.adjust(unlist(pvals.modules))
   pval.modules.adj <- pvals.modules

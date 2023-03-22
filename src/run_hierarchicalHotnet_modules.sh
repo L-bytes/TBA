@@ -27,8 +27,7 @@ mkdir -p $results
 
 ### Set parameters
 modules=($1)
-echo ${modules[@]}
-thresholds=(003)
+thresholds=($2)
 methods=(log2)
 num_permutations=100
 : '
@@ -150,6 +149,7 @@ done
 for module in ${modules[@]}
 do
 	echo $module
+	start=$(date +%s)
 	if [ $module == grey ]
   then
     continue
@@ -277,5 +277,7 @@ do
   		done
   	done
   fi
+  end=$(date +%s)
+  echo "Elapsed Time: $(($end-$start)) seconds"
 done
 #'
