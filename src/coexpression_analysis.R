@@ -58,7 +58,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
   modules <- levels(as.factor(moduleColors))
   n.modules <- length(modules)
   
-  png(file=paste0(figfolder, '/module_dendrogram.png'), width=960, height=480)
+  png(file=paste0(figfolder, '/module_dendrogram.png'), width=1920, height=1080)
   plotDendroAndColors(coex.net$dendrograms[[1]], moduleColors,
                       "Module colors", dendroLabels=FALSE, hang=0.03, addGuide=TRUE, guideHang=0.05, cex.lab = 2, cex.axis = 2, cex.main = 2)#,
   #abHeight=0.85, abCol='red')
@@ -77,7 +77,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
   for (i in 1:(n.modules-1)){
     module <- labels2colors(i)
     # Plot module eigengene expression
-    png(paste0(figfolder, '/ME_distribution_', i, '_', module, '.png'))
+    png(paste0(figfolder, '/ME_distribution_', i, '_', module, '.png'), width=1920, height=1080)
     boxplot(ME.SNV[,paste0('ME', i)], ME.WT[,paste0('ME', i)], names=c('SNV', 'WT'),
             col=module, xlab='group', ylab='ME value', cex.lab = 2, cex.axis = 2, cex.main = 2)
     dev.off()

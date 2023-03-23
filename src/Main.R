@@ -1,6 +1,6 @@
 ####### Main workflow in the paper
 # If you only want to run part of the workflow, you can load the required data from the previous steps as indicated in each section below (load(...))
-
+startTime <- Sys.time()
 #######################################
 ###      Load required packages     ###
 #######################################
@@ -445,7 +445,7 @@ for (module in modules){
     i2g.2 <- data.frame(matrix(nrow=0, ncol=2))
     time2 <- Sys.time()
     print("Slicing input:")
-    difftime(time2, time1, units="secs")
+    print(difftime(time2, time1, units="secs"))
     # Write tables: one with edges between all nodes, one with a treshold of 0.05 and one with custom thresholds
     for (i in 1:(nrow(TOMmodule)-1)){
       for (j in (i+1):nrow(TOMmodule)){
@@ -484,7 +484,7 @@ for (module in modules){
     #  write.table(i2g.2, file=paste0('output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
     time2 <- Sys.time()
     print("Writing data:")
-    difftime(time2, time1, units="secs")
+    print(difftime(time2, time1, units="secs"))
   }
 }
 
@@ -531,9 +531,9 @@ for (module in modules){
           next
         }
         else {
-          gsea <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.2, OrgDb=org.Hs.eg.db)
+          go <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.2, OrgDb=org.Hs.eg.db)
           png(file=paste0('figures/GO/GO_', module, '.png'), width=1920, height=1020)
-          barplot(gsea, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2)
+          barplot(go, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2)
           dev.off()
         }
       }
@@ -543,6 +543,8 @@ for (module in modules){
 time2 <- Sys.time()
 print("GO:")
 difftime(time2, time1, units="secs")
+endTime <- Sys.time()
+difftime(endTime, startTime, units="secs")
 #######################################
 ###          Validation             ###
 #######################################
