@@ -16,21 +16,18 @@
 ################################################################################
 
 ### Create data, intermediate data and results, and results directories.
-module purge
-module load 2022
-module load py
 echo "Creating directory topology"
-data=$TMPDIR/output/hotnet/HotNet_input
-intermediate=$TMPDIR/output/hotnet/HotNet_intermediate
-results=$TMPDIR/output/hotnet/HotNet_results
-scripts=$HOME/Project/hierarchical-hotnet/src #Replace with directory where Hierarchical HotNet is installed
+data=$PWD/output/hotnet/HotNet_input
+intermediate=$PWD/output/hotnet/HotNet_intermediate
+results=$PWD/output/hotnet/HotNet_results
+scripts=$PWD/hierarchical-hotnet/src #Replace with directory where Hierarchical HotNet is installed
 
 mkdir -p $intermediate
 mkdir -p $results
 
 ### Set parameters
-modules=(black blue brown cyan green greenyellow grey60 lightcyan magenta midnightblue pink purple  red  salmon tan turquoise yellow royalblue orange lightyellow lightgreen darkturquoise darkred darkgrey)
-thresholds=(003)
+modules=($1)
+thresholds=($2)
 methods=(log2)
 num_permutations=100
 : '
@@ -44,7 +41,7 @@ do
 	#
 	################################################################################
 	#echo "Creating input files..."
-	#python3.53 ../create_hotnet_input.py $data/edges_expression_"$thr".tsv $data/i2g_"$thr"_all.tsv $data/edge_list_"$thr"_all.tsv
+	#python2.7 ../create_hotnet_input.py $data/edges_expression_"$thr".tsv $data/i2g_"$thr"_all.tsv $data/edge_list_"$thr"_all.tsv
 	################################################################################
 	#
 	#   Construct similarity matrices.
@@ -52,7 +49,7 @@ do
 	################################################################################
 	echo "Construct similarity matrices..."
 	#echo $scripts/construct_similarity_matrix.py
-	python3.5 $scripts/construct_similarity_matrix.py \
+	python2.7 $scripts/construct_similarity_matrix.py \
 		-i   $data/edge_list_"$thr"_all.tsv \
 		-o   $intermediate/similarity_matrix_"$thr"_all.h5 \
 		-bof $intermediate/beta_"$thr"_all.txt
@@ -66,7 +63,7 @@ do
 	for method in ${methods[@]}
 	do
 		echo $method
-		python3.5 $scripts/find_permutation_bins.py \
+		python2.7 $scripts/find_permutation_bins.py \
 			-gsf $data/g2s_"$method"_all.tsv \
 			-igf $data/i2g_"$thr"_all.tsv \
 			-elf $data/edge_list_"$thr"_all.tsv \
@@ -152,127 +149,135 @@ done
 for module in ${modules[@]}
 do
 	echo $module
-	for thr in ${thresholds[@]}
-	do
-		echo $thr
-		################################################################################
-		#
-		#   Create relevant input files
-		#
-		################################################################################
-		#: '
-
-		#python2.7 ../create_hotnet_input.py $data/name_edges_expression_"$thr"_"$module".tsv $data/i2g_"$thr"_"$module".tsv $data/edge_list_"$thr"_"$module".tsv
-		################################################################################
-		#
-		#   Construct similarity matrices.
-		#
-		################################################################################
-
-		echo "Construct similarity matrices..."
-
-		#echo $scripts/construct_similarity_matrix.py
-		python2.7 $scripts/construct_similarity_matrix.py \
-			-i   $data/edge_list_"$thr"_"$module".tsv \
-			-o   $intermediate/similarity_matrix_"$thr"_"$module".h5 \
-			-bof $intermediate/beta_"$thr"_"$module".txt
-		
-		################################################################################
-		#
-		#   Permute data.
-		#
-		################################################################################
-
-		echo "Permuting scores..."
-		#'
-		for method in ${methods[@]}
-		do
-			echo $method
-			#: '
-			python2.7 $scripts/find_permutation_bins.py \
-				-gsf $data/g2s_"$method"_"$module".tsv \
-				-igf $data/i2g_"$thr"_"$module".tsv \
-				-elf $data/edge_list_"$thr"_"$module".tsv \
-				-ms  10 \
-				-o   $intermediate/score_bins_"$method"_"$thr"_"$module".tsv
-
-			for i in `seq $num_permutations`
-			do
-				python2.7 $scripts/permute_scores.py \
-					-i  $data/g2s_"$method"_"$module".tsv \
-					-bf $intermediate/score_bins_"$method"_"$thr"_"$module".tsv \
-					-s  "$i" \
-					-o  $intermediate/scores_"$method"_"$thr"_"$module"_"$i".tsv
-			done
-
-			################################################################################
-			#
-			#   Construct hierarchies.
-			#
-			################################################################################
-
-			echo "Constructing hierarchies..."
-			cp $data/g2s_"$method"_"$module".tsv $intermediate/scores_"$method"_"$thr"_"$module"_0.tsv
-
-			for i in `seq 0 $num_permutations`
-			do
-				python2.7  $scripts/construct_hierarchy.py \
-					-smf  $intermediate/similarity_matrix_"$thr"_"$module".h5 \
-					-igf  $data/i2g_"$thr"_"$module".tsv \
-					-gsf  $intermediate/scores_"$method"_"$thr"_"$module"_"$i".tsv \
-					-helf $intermediate/hierarchy_edge_list_"$method"_"$thr"_"$module"_"$i".tsv \
-					-higf $intermediate/hierarchy_index_"$method"_"$thr"_"$module"_gene_"$i".tsv
-			done
-
-			################################################################################
-			#
-			#   Process hierarchies.
-			#
-			################################################################################
-
-			echo "Processing hierarchies..."
-			# This example uses -lsb/--lower_size_bound 1 because it is a small toy example
-			# with 25 vertices.  Use larger value (default is 10) for larger graphs.
-			python2.7  $scripts/process_hierarchies.py \
-				-oelf $intermediate/hierarchy_edge_list_"$method"_"$thr"_"$module"_0.tsv \
-				-oigf $intermediate/hierarchy_index_"$method"_"$thr"_"$module"_gene_0.tsv \
-				-pelf $(for i in `seq $num_permutations`; do echo " $intermediate/hierarchy_edge_list_"$method"_"$thr"_"$module"_"$i".tsv "; done) \
-				-pigf $(for i in `seq $num_permutations`; do echo " $intermediate/hierarchy_index_"$method"_"$thr"_"$module"_gene_"$i".tsv "; done) \
-				-lsb  5 \
-				-cf   $results/clusters_hierarchies_"$method"_"$thr"_"$module".tsv \
-				-pl   network_"$method"_"$thr"_"$module" \
-				-pf   $results/sizes_network_"$method"_"$thr"_"$module".pdf
-
-			################################################################################
-			#
-			#   Perform consensus.
-			#
-			################################################################################
-
-			echo "Performing consensus..."
-			python2.7  $scripts/perform_consensus.py \
-				-cf  $results/clusters_hierarchies_"$method"_"$thr"_"$module".tsv \
-				-igf $data/i2g_"$thr"_"$module".tsv \
-				-elf $data/edge_list_"$thr"_"$module".tsv \
-				-n   network_"$method"_"$thr"_"$module" \
-				-s   g2s_"$method"_"$module" \
-				-t   1 \
-				-cnf $results/consensus_nodes_"$method"_"$thr"_"$module".tsv \
-				-cef $results/consensus_edges_"$method"_"$thr"_"$module".tsv
-
-			################################################################################
-			#
-			#   Create output graph.
-			#
-			################################################################################
-			#'
-			echo "Creating expression graph..."
-			python2.7  $scripts/HotNet_graph_consensus.py \
-				-igf $data/i2g_"$thr"_"$module".tsv \
-				-elf $results/consensus_edges_"$method"_"$thr"_"$module".tsv \
-				-gsf $data/g2s_"$method"_"$module".tsv \
-				-pf $results/subnetworks_"$method"_"$thr"_"$module".png
-		done
-	done
+	start=$(date +%s)
+	if [ $module == grey ]
+  then
+    continue
+  else
+  	for thr in ${thresholds[@]}
+  	do
+  		echo $thr
+  		################################################################################
+  		#
+  		#   Create relevant input files
+  		#
+  		################################################################################
+  		#: '
+  
+  		#python2.7 ../create_hotnet_input.py $data/name_edges_expression_"$thr"_"$module".tsv $data/i2g_"$thr"_"$module".tsv $data/edge_list_"$thr"_"$module".tsv
+  		################################################################################
+  		#
+  		#   Construct similarity matrices.
+  		#
+  		################################################################################
+  
+  		echo "Construct similarity matrices..."
+  
+  		#echo $scripts/construct_similarity_matrix.py
+  		python2.7 $scripts/construct_similarity_matrix.py \
+  			-i   $data/edge_list_"$thr"_"$module".tsv \
+  			-o   $intermediate/similarity_matrix_"$thr"_"$module".h5 \
+  			-bof $intermediate/beta_"$thr"_"$module".txt
+  		
+  		################################################################################
+  		#
+  		#   Permute data.
+  		#
+  		################################################################################
+  
+  		echo "Permuting scores..."
+  		#'
+  		for method in ${methods[@]}
+  		do
+  			echo $method
+  			#: '
+  			python2.7 $scripts/find_permutation_bins.py \
+  				-gsf $data/g2s_"$method"_"$module".tsv \
+  				-igf $data/i2g_"$thr"_"$module".tsv \
+  				-elf $data/edge_list_"$thr"_"$module".tsv \
+  				-ms  10 \
+  				-o   $intermediate/score_bins_"$method"_"$thr"_"$module".tsv
+  
+  			for i in `seq $num_permutations`
+  			do
+  				python2.7 $scripts/permute_scores.py \
+  					-i  $data/g2s_"$method"_"$module".tsv \
+  					-bf $intermediate/score_bins_"$method"_"$thr"_"$module".tsv \
+  					-s  "$i" \
+  					-o  $intermediate/scores_"$method"_"$thr"_"$module"_"$i".tsv
+  			done
+  
+  			################################################################################
+  			#
+  			#   Construct hierarchies.
+  			#
+  			################################################################################
+  
+  			echo "Constructing hierarchies..."
+  			cp $data/g2s_"$method"_"$module".tsv $intermediate/scores_"$method"_"$thr"_"$module"_0.tsv
+  
+  			for i in `seq 0 $num_permutations`
+  			do
+  				python2.7  $scripts/construct_hierarchy.py \
+  					-smf  $intermediate/similarity_matrix_"$thr"_"$module".h5 \
+  					-igf  $data/i2g_"$thr"_"$module".tsv \
+  					-gsf  $intermediate/scores_"$method"_"$thr"_"$module"_"$i".tsv \
+  					-helf $intermediate/hierarchy_edge_list_"$method"_"$thr"_"$module"_"$i".tsv \
+  					-higf $intermediate/hierarchy_index_"$method"_"$thr"_"$module"_gene_"$i".tsv
+  			done
+  
+  			################################################################################
+  			#
+  			#   Process hierarchies.
+  			#
+  			################################################################################
+  
+  			echo "Processing hierarchies..."
+  			# This example uses -lsb/--lower_size_bound 1 because it is a small toy example
+  			# with 25 vertices.  Use larger value (default is 10) for larger graphs.
+  			python2.7  $scripts/process_hierarchies.py \
+  				-oelf $intermediate/hierarchy_edge_list_"$method"_"$thr"_"$module"_0.tsv \
+  				-oigf $intermediate/hierarchy_index_"$method"_"$thr"_"$module"_gene_0.tsv \
+  				-pelf $(for i in `seq $num_permutations`; do echo " $intermediate/hierarchy_edge_list_"$method"_"$thr"_"$module"_"$i".tsv "; done) \
+  				-pigf $(for i in `seq $num_permutations`; do echo " $intermediate/hierarchy_index_"$method"_"$thr"_"$module"_gene_"$i".tsv "; done) \
+  				-lsb  5 \
+  				-cf   $results/clusters_hierarchies_"$method"_"$thr"_"$module".tsv \
+  				-pl   network_"$method"_"$thr"_"$module" \
+  				-pf   $results/sizes_network_"$method"_"$thr"_"$module".pdf
+  
+  			################################################################################
+  			#
+  			#   Perform consensus.
+  			#
+  			################################################################################
+  
+  			echo "Performing consensus..."
+  			python2.7  $scripts/perform_consensus.py \
+  				-cf  $results/clusters_hierarchies_"$method"_"$thr"_"$module".tsv \
+  				-igf $data/i2g_"$thr"_"$module".tsv \
+  				-elf $data/edge_list_"$thr"_"$module".tsv \
+  				-n   network_"$method"_"$thr"_"$module" \
+  				-s   g2s_"$method"_"$module" \
+  				-t   1 \
+  				-cnf $results/consensus_nodes_"$method"_"$thr"_"$module".tsv \
+  				-cef $results/consensus_edges_"$method"_"$thr"_"$module".tsv
+  
+  			################################################################################
+  			#
+  			#   Create output graph.
+  			#
+  			################################################################################
+  			#'
+  			echo "Creating expression graph..."
+  			python2.7  $scripts/HotNet_graph_consensus.py \
+  				-igf $data/i2g_"$thr"_"$module".tsv \
+  				-elf $results/consensus_edges_"$method"_"$thr"_"$module".tsv \
+  				-gsf $data/g2s_"$method"_"$module".tsv \
+  				-pf $results/subnetworks_"$method"_"$thr"_"$module".png
+  		done
+  	done
+  fi
+  end=$(date +%s)
+  echo "Elapsed Time: $(($end-$start)) seconds"
 done
 #'

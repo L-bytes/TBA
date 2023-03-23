@@ -1,20 +1,25 @@
 ####### Main workflow in the paper
 # If you only want to run part of the workflow, you can load the required data from the previous steps as indicated in each section below (load(...))
-### Set working directory to scratch on LISA
 argv = commandArgs(trailingOnly=TRUE)
+startTime <- Sys.time()
 #######################################
 ###      Load required packages     ###
 #######################################
 library(ibb)
 library(stringr)
 library(BiocManager)
+library(BiocParallel)
 library(BioNet)
 library(pheatmap)
 library(countdata)
 library(DESeq2)
+library("vsn")
 library('org.Hs.eg.db')
-library(WGCNA)
 library(clusterProfiler)
+library(ggplot2)
+library(pheatmap)
+library(RColorBrewer)
+library(WGCNA)
 options(stringsAsFactors=FALSE)
 # Load required functions from the src directory
 source(paste(argv[2],'/src/preprocessing.R', sep=""))
@@ -28,8 +33,8 @@ source(paste(argv[2],'/src/validation.R', sep=""))
 #######################################
 ###             Setup               ###
 #######################################
-### Set working directory to scratch on LISA
-setwd(argv[1]) #Replace with your working directory
+### Set working directory
+setwd(argv[1])  #Replace with your working directory
 
 ### Create output directories
 dir.create('output')
@@ -37,21 +42,21 @@ dir.create('figures')
 dir.create('rdata')
 
 ### Load data
+time1 <- Sys.time()
 d <- read.table('./data/TCGA_rna_count_data.txt', header=TRUE, sep='\t', quote="", row.names = 1, check.names=FALSE)
 group.data <- read.table('./data/non_silent_mutation_profile_crc.txt', header=TRUE, sep='\t', quote="", row.names = 1, check.names=FALSE)
+time2 <- Sys.time()
+print("Loading data:")
+difftime(time2, time1, units="secs")
 
-# Get only the columns with expression values
-
-#d <- d[1800:3600,1:10]
+time1 <- Sys.time()
+d <- d[1:1000,]
 d <- d[,colnames(d) %in% rownames(group.data)]
 group.data <- group.data[rownames(group.data) %in% colnames(d),]
-
 new_order <- sort(colnames(d))
 d <- d[, new_order]
-
 new_order_rows <- sort(rownames(d))
 d <- d[new_order_rows,]
-
 d.raw <- d[,1:ncol(d)]
 d.raw <- apply(d.raw, c(1,2), as.numeric)
 # Get identifiers of genes
@@ -62,12 +67,31 @@ count.groups <- d.raw
 colnames(count.groups) <- groups
 # Save input data
 save(d.raw, group.data, groups, ids, file='rdata/input_data.RData')
+time2 <- Sys.time()
+print("Processing data:")
+difftime(time2, time1, units="secs")
+
+png(file=paste0('figures/sampleCluster.png'), width=1920, height=1020)
+plotClusterTreeSamples(t(d.raw), groups, cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+png(file=paste0('figures/meanExpression.png'), width=1920, height=1020)
+barplot(apply(t(d.raw),1,mean, na.rm=T),
+        xlab = "Sample", ylab = "Mean expression",
+        main ="Mean expression across samples", cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+png(file=paste0('figures/variance.png'), width=1920, height=1020)
+meanSdPlot(d.raw, cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
 
 
 #######################################
 ###         Preprocessing           ###
 #######################################
 #load(file='rdata/input_data.rdata')
+dir.create('figures/differential expression')
 d.norm <- normalize.sample(d.raw)
 d.cs <- normalize.cs(d.norm)
 length <- length(groups)
@@ -76,7 +100,8 @@ colnames(d.cs) <- paste(groups, 1:length, sep='_')
 # save input data into a file
 save(d.norm, d.cs, ids, groups, file='rdata/normalized_data.rdata')
 
-#DE-SEQ
+#DESeq2
+time1 <- Sys.time()
 group.KRAS <- as.matrix(group.data[,"KRAS"])
 rownames(group.KRAS) <- rownames(group.data)
 colnames(group.KRAS) <- c("KRAS")
@@ -91,53 +116,117 @@ results.names <- resultsNames(dds)
 res
 results.names
 colnames(d.raw) <- groups
-
 #Normalization
-#Normalization
-dds2 <- estimateSizeFactors(dds)
-vsd <- varianceStabilizingTransformation(dds2, blind=F)
-d.adj <- counts(dds2, normalized=TRUE)
+d.adj <- assay(varianceStabilizingTransformation(dds, blind = F))
 colnames(d.adj) <- groups
-
+print(Sys.time())
 if (any(is.na(d.adj))){
   print("NA present")
 }
-
 d.summary <- data.frame(unlist(res$log2FoldChange), unlist(res$padj), row.names = rownames(res))
 colnames(d.summary) <- c("log2FC", "Pvalue")
-
 d.summary <- na.omit(d.summary)
-
 d.adj <- d.adj[rownames(d.adj) %in% rownames(d.summary),]
 ids <- rownames(d.adj)
-
-# resLFC <- lfcShrink(dds, coef="KRAS_2_vs_1", type="apeglm")
-# resLFC
+time2<- Sys.time()
+print("DESeq2:")
+difftime(time2, time1, units="secs")
 
 #Some plots
-# idx <- identify(res$baseMean, res$log2FoldChange)
-# rownames(res)[idx]
-# plotCounts(dds, gene=which.min(res$padj), intgroup="KRAS")
-# ntd <- normTransform
-# BiocManager::install("vsn")
-# library("vsn")
-# meanSdPlot(assay(ntd))
-# library("pheatmap")
-# select <- order(rowMeans(counts(dds,normalized=TRUE)),
-#                 decreasing=TRUE)
-# df <- as.data.frame(colData(dds)[,c("KRAS")])
-# rownames(df) <- colnames(assay(ntd)[select,])
-# pheatmap(assay(ntd)[select,], cluster_rows=FALSE, show_rownames=FALSE, cluster_cols=FALSE, annotation_col=df)
-# plotDispEsts(dds)
+png(file=paste0('figures/differential expression/clusterSamples.png'), width=1920, height=1020)
+plotClusterTreeSamples(t(d.adj), groups, cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+png(file=paste0('figures/differential expression/meanExpression.png'), width=1920, height=1020)
+barplot(apply(t(d.adj),1,mean, na.rm=T),
+        xlab = "Sample", ylab = "Mean expression",
+        main ="Mean expression across samples", cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+png(file=paste0('figures/differential expression/variance.png'), width=1920, height=1020)
+meanSdPlot(d.adj, cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+png(file=paste0('figures/differential expression/MA.png'), width=1920, height=1020)
+plotMA(res, ylim=c(-2,2), cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+png(file=paste0('figures/differential expression/counts.png'), width=1920, height=1020)
+plotCounts(dds, gene=which.min(res$padj), intgroup="KRAS", cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+
+select <- order(rowMeans(counts(dds,normalized=TRUE)),
+                decreasing=TRUE)
+df <- as.data.frame(colData(dds)[,c("KRAS")])
+rownames(df) <- colnames(assay(dds)[select,])
+png(file=paste0('figures/differential expression/heatmap.png'), width=1920, height=1020)
+pheatmap(assay(dds)[select,], cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, annotation_col=df, cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+
+sampleDists <- dist(t(assay(dds)))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- paste(dds$KRAS, sep="-")
+colnames(sampleDistMatrix) <- paste(dds$KRAS, sep="-")
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+png(file=paste0('figures/differential expression/sampleDistances.png'), width=1920, height=1020)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+png(file=paste0('figures/differential expression/dispersion.png'), width=1920, height=1020)
+plotDispEsts(dds, cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+png(file=paste0('figures/differential expression/rejections.png'), width=1920, height=1020)
+plot(metadata(res)$filterNumRej, 
+     type="b", ylab="number of rejections",
+     xlab="quantiles of filter", cex.lab = 2, cex.axis = 2, cex.main = 2)
+lines(metadata(res)$lo.fit, col="red")
+abline(v=metadata(res)$filterTheta)
+dev.off()
+
+png(file=paste0('figures/differential expression/outliers.png'), width=1920, height=1020)
+boxplot(log10(assays(dds)[["cooks"]]), range=0, las=2)
+dev.off()
+
+W <- res$stat
+maxCooks <- apply(assays(dds)[["cooks"]],1,max)
+idx <- !is.na(W)
+png(file=paste0('figures/differential expression/Wald.png'), width=1920, height=1020)
+plot(rank(W[idx]), maxCooks[idx], xlab="rank of Wald statistic", 
+     ylab="maximum Cook's distance per gene",
+     ylim=c(0,5), cex=.4, col=rgb(0,0,0,.3), cex.lab = 2, cex.axis = 2, cex.main = 2)
+m <- ncol(dds)
+p <- 3
+abline(h=qf(.99, p, m - p))
+dev.off()
+
+use <- res$baseMean > metadata(res)$filterThreshold
+h1 <- hist(res$pvalue[!use], breaks=0:50/50, plot=FALSE)
+h2 <- hist(res$pvalue[use], breaks=0:50/50, plot=FALSE)
+colori <- c(`do not pass`="khaki", `pass`="powderblue")
+png(file=paste0('figures/differential expression/pass.png'), width=1920, height=1020)
+barplot(height = rbind(h1$counts, h2$counts), beside = FALSE,
+        col = colori, space = 0, main = "", ylab="frequency", cex.lab = 2, cex.axis = 2, cex.main = 2)
+text(x = c(0, length(h1$counts)), y = 0, label = paste(c(0,1)),
+     adj = c(0.5,1.7), xpd=NA)
+legend("topright", fill=rev(colori), legend=rev(names(colori)))
+dev.off()
 
 #######################################
 ### Differential expression analysis###
 #######################################
-### Test significance of differential expression between the groups
-# load(file='rdata/normalized_data.RData')
+## Test significance of differential expression between the groups
+#load(file='rdata/normalized_data.RData')
 # dir.create('output/differential_expression')
+# print(Sys.time())
 # # Beta binomial test
 # bb <- betaBinomial(d.norm, ids, groups, 'WT', 'SNV', 'two.sided')
+# print(Sys.time())
 # d.sign <- data.frame(log2FC=bb$table[ids,]$Log2ratio, Pvalue=bb$table[ids,]$Pvalue)
 # rownames(d.sign) <- ids
 # # Merge stats about P-value thresholds and number of significant proteins
@@ -189,70 +278,100 @@ ids <- rownames(d.adj)
 #######################################
 ###   WGCNA coexpression analysis   ###
 #######################################
-# load(file='rdata/input_data.rdata')
-# load(file='rdata/normalized_data.rdata')
-# load(file='rdata/differential_expression.rdata')
+#load(file='rdata/input_data.RData')
+#load(file='rdata/normalized_data.RData')
+#load(file='rdata/differential_expression.RData')
 #source('src/coexpression_analysis_prep.R')
 dir.create('figures/coexpression')
 dir.create('output/coexpression')
 
+time1 <- Sys.time()
 d.log2vals <- as.data.frame(d.summary[, c('log2FC')], row.names=row.names(d.summary))
 colnames(d.log2vals) <- c('log2FC')
 coexpression <- coexpression.analysis(t(d.adj), d.log2vals, 'output/coexpression', 'figures/coexpression')
 wgcna.net <- coexpression[[1]]
 module.significance <- coexpression[[2]]
 power <- coexpression[[3]]
+time2 <- Sys.time()
+print("WGCNA:")
+difftime(time2, time1, units="secs")
 # Merge M18 (lightgreen) into M9 (magenta), since they were highly similar
 #wgcna.net$colors <- replace(wgcna.net$colors, wgcna.net$colors==18, 9)
 log2vals <- d.summary$log2FC
 names(log2vals) <- ids
-gns<-mapIds(org.Hs.eg.db, keys = ids, column = "ENTREZID", keytype = "SYMBOL")
-#GOenr.net <- GO.terms.modules(wgcna.net, ids, log2vals, gns, 'figures/coexpression', 'output/coexpression')
-
+pvals <- d.summary$Pvalue
+names(pvals) <- ids
+# Module labels and log2 values
+moduleColors <- labels2colors(wgcna.net$colors)
+modules <- levels(as.factor(moduleColors))
+log2.SNV.WT <- d.summary$log2FC
+P.SNV.WT <- d.summary$Pvalue
+#gns<-mapIds(org.Hs.eg.db, keys = ids, column = "ENTREZID", keytype = "SYMBOL")
+# GOenr.net <- GO.terms.modules(wgcna.net, ids, log2vals, gns, 'figures/coexpression', 'output/coexpression')
 # Save data structures
-#save(wgcna.net, GOenr.net, module.significance, ids, file='rdata/coexpression.RData')
+# save(wgcna.net, GOenr.net, module.significance, ids, file='rdata/coexpression.RData')
 
 ### PLOTS
-#adjMat <- adjacency(d.adj,
-#          type = "unsigned", 
-#          power = 3,
-#          distFnc = "dist", distOptions = "method = 'euclidean'")
-#          
-#dissim <- TOMdist(
-#    adjMat,
-#    TOMType = "unsigned",
-#    TOMDenom = "min",
-#    suppressTOMForZeroAdjacencies = FALSE,
-#    suppressNegativeTOM = FALSE,
-#    useInternalMatrixAlgebra = FALSE,
-#    verbose = 1,
-#    indent = 0)
-#    
-#TOMplot <- TOMplot(
-#   dissim, 
-#   wgcna.net$dendrograms[[1]],
-#   terrainColors = FALSE, 
-#   setLayout = TRUE)
-#   
-#networkHeatmap <- plotNetworkHeatmap(
-#  d.adj, 
-#  ids,
-#  useTOM = TRUE, 
-#  power = 2, 
-#  networkType = "unsigned", 
-#  main = "Heatmap of the network")
-#
-#moduleSignificance <- plotModuleSignificance(
-#    d.summary$Pvalue
-#    labels2colors(wgcna.net$colors), 
-#    boxplot = FALSE, 
-#    main = "Gene significance across modules,", 
-#    ylab = "Gene Significance")
-#
-#MEpairs <-  plotMEpairs(
-#     d.adj,
-#     main = "Relationship between module eigengenes", 
-#     clusterMEs = TRUE)
+TOM <- TOMsimilarityFromExpr(t(d.adj[ids[moduleColors != "grey"],]), power=power, TOMType="unsigned")
+diss2 <- 1-TOM
+hier2 <- hclust(as.dist(diss2), method="average")
+colorDynamicTOM <- labels2colors(cutreeDynamic(hier2,method="tree"))
+#restGenes <- (colorDynamicTOM != "grey")
+diag(diss2) = NA;
+
+#restGenes <- (colorDynamicTOM != "grey")
+#diss2 <- 1 - TOMsimilarityFromExpr(t(d.adj[restGenes,]), power = power)
+#hier2 <- hclust(as.dist(diss2), method="average" )
+#diag(diss2) = NA;
+
+png(file=paste0('figures/coexpression/TOMheatmap.png'), width=1920, height=1020)
+TOMplot(diss2^4, hier2, main = "TOM heatmap plot, module genes", terrainColors = FALSE, cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+png(file=paste0('figures/coexpression/networkHeatmap.png'), width=1920, height=1020)
+plotNetworkHeatmap(
+  t(d.adj),
+  ids,
+  useTOM = TRUE,
+  power = power,
+  networkType = "unsigned",
+  main = "Heatmap of the network")
+dev.off()
+
+png(file=paste0('figures/coexpression/moduleSignificance.png'), width=1920, height=1020)
+plotModuleSignificance(
+  d.summary$Pvalue,
+  labels2colors(wgcna.net$colors),
+  boxplot = FALSE,
+  main = "Gene significance across modules,",
+  ylab = "Gene Significance", cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+datME <- moduleEigengenes(t(d.adj[ids[moduleColors != "grey"],]),colorDynamicTOM)$eigengenes
+dissimME <- (1-t(cor(datME, method="p")))/2
+hclustdatME <- hclust(as.dist(dissimME), method="average" )
+# Plot the eigengene dendrogram
+png(file=paste0('figures/coexpression/moduleEigengenes.png'), width=1920, height=1020)
+par(mfrow=c(1,1))
+plot(hclustdatME, main="Clustering tree based of the module eigengenes", cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+#png(file=paste0('figures/coexpression/MEpairs.png'), width=1920, height=1020)
+#MEpairs <- plotMEpairs(
+#  datME,
+#  main = "Relationship between module eigengenes",
+#  clusterMEs = TRUE)
+#dev.off()
+
+GS1 <- as.numeric(cor(group.KRAS,t(d.adj[ids[moduleColors != "grey"],]), use="p"))
+GeneSignificance <- abs(GS1)
+ModuleSignificance <- tapply(GeneSignificance, colorDynamicTOM, mean, na.rm=T)
+png(file=paste0('figures/coexpression/moduleSignificance.png'), width=1920, height=1020)
+plotModuleSignificance(GeneSignificance,colorDynamicTOM, cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+disableWGCNAThreads()
+
 
 #######################################
 ###       Hierarchical HotNet       ###
@@ -268,109 +387,167 @@ dir.create('figures/hotnet')
 dir.create('output/hotnet')
 dir.create('output/hotnet/HotNet_input')
 
-# Get TOM matrix
-TOM <- TOMsimilarityFromExpr(t(d.adj), power=power)
-
-# Module labels and log2 values
-moduleColors <- labels2colors(wgcna.net$colors)
-modules <- levels(as.factor(moduleColors))
-log2.SNV.WT <- d.summary$log2FC
-P.SNV.WT <- d.summary$Pvalue
+cutOff <- quantile(as.vector(TOM), probs=0.95)
+print(cutOff)
 
 # Get table with interactions for each module
 for (module in modules){
-  print(module)
-  
-  # Select proteins in module
-  inModule <- moduleColors == module
-  sum(inModule)
-  TOMmodule <- TOM[inModule, inModule]
-  idsModule <- ids[inModule]
-  log2ModuleProteins <- log2.SNV.WT[inModule]
-  PModuleProteins <- P.SNV.WT[inModule]
-  
-  # Convert Uniprot IDs to Gene symbols
-  namesModule <- idsModule
-  for (i in 1:length(namesModule)){
-    # If there is no gene name associated with the Uniprot ID, keep the uniprot ID
-    if (is.na(namesModule[i])){
-      namesModule[i] <- idsModule[i]
-    }
-  }
-  node.frame <- data.frame(Symbol=idsModule, LogFC=log2ModuleProteins, Pvalue=PModuleProteins)
-  rownames(node.frame) <- 1:nrow(node.frame)
-  node.frame$InvPvalue <- 1 - PModuleProteins
-  write.table(node.frame, file=paste0('output/hotnet/nodes_', module, '.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
-  write.table(node.frame[, c('Symbol', 'InvPvalue')], file=paste0('output/hotnet/HotNet_input/g2s_Pval_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-  names(namesModule) <- idsModule
-  
-  write.table(node.frame[, c('Symbol', 'LogFC')], file=paste0('output/hotnet/HotNet_input/g2s_log2_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-  
-  #nodeColorsModule <- node.colors[inModule]
-  
-  # Create empty dataframes
-  edges.matrix.1 <- data.frame(matrix(nrow=0, ncol=2))
-  edges.matrix.2 <- data.frame(matrix(nrow=0, ncol=2))
-  edges.matrix.1.num <- data.frame(matrix(nrow=0, ncol=2))
-  edges.matrix.2.num <- data.frame(matrix(nrow=0, ncol=2))
-  i2g.1 <- data.frame(matrix(nrow=0, ncol=2))
-  i2g.2 <- data.frame(matrix(nrow=0, ncol=2))
-  
-  # Write tables: one with edges between all nodes, one with a treshold of 0.05 and one with custom thresholds
-  for (i in 1:(nrow(TOMmodule)-1)){
-    #print(i)
-    for (j in (i+1):nrow(TOMmodule)){
-      if (TOMmodule[i,j] > 0.03){
-        # Add edge to list
-        edges.matrix.1[nrow(edges.matrix.1)+1,] <- c(namesModule[i],namesModule[j])
-        edges.matrix.1.num[nrow(edges.matrix.1.num)+1,] <- c(i,j)
-        # Add node to node list
-        if (!i %in% i2g.1[,1]){
-          i2g.1[nrow(i2g.1)+1,] <- c(i, namesModule[i])
-        }
-        if (!j %in% i2g.1[,1]){
-          i2g.1[nrow(i2g.1)+1,] <- c(j, namesModule[j])
-        }
-      }
-      if (TOMmodule[i,j] > 0.01){
-        # Add edge to list
-        edges.matrix.2[nrow(edges.matrix.2)+1,] <- c(namesModule[i],namesModule[j])
-        edges.matrix.2.num[nrow(edges.matrix.2.num)+1,] <- c(i,j)
-        # Add node to node list
-        if (!i %in% i2g.2[,1]){
-          i2g.2[nrow(i2g.2)+1,] <- c(i, namesModule[i])
-        }
-        if (!j %in% i2g.2[,1]){
-          i2g.2[nrow(i2g.2)+1,] <- c(j, namesModule[j])
-        }
+  if (module == "grey"){
+    next
+  } 
+  else {
+    print(module)
+    time1 <- Sys.time()
+    png(file=paste0('figures/coexpression/', module, '_matrix.png'), width=1920, height=1020)
+    plotMat(t(scale(t(d.adj[colorDynamicTOM==module,]))),rlabels=T,
+            clabels=T,rcols=module,
+            title=module, cex.lab = 2, cex.axis = 2, cex.main = 2)
+    dev.off()
+    
+    ME=datME[, paste("ME",module, sep="")]
+    par(mar=c(5, 4.2, 0, 0.7))
+    png(file=paste0('figures/coexpression/', module, '_ME.png'), width=1920, height=1020)
+    barplot(ME, col=module, main="", cex.main=2,
+            ylab="eigengene expression",xlab="array sample", cex.lab = 2, cex.axis = 2, cex.main = 2)
+    dev.off()
+    # Select proteins in module
+    moduleColors2 <- moduleColors[moduleColors != "grey"]
+    inModule <- moduleColors2 == module
+    sum(inModule)
+    TOMmodule <- TOM[inModule, inModule]
+    idsModule <- ids[inModule]
+    log2ModuleProteins <- log2.SNV.WT[inModule]
+    PModuleProteins <- P.SNV.WT[inModule]
+    
+    # Convert Uniprot IDs to Gene symbols
+    namesModule <- idsModule
+    for (i in 1:length(namesModule)){
+      # If there is no gene name associated with the Uniprot ID, keep the uniprot ID
+      if (is.na(namesModule[i])){
+        namesModule[i] <- idsModule[i]
       }
     }
+    node.frame <- data.frame(Symbol=idsModule, LogFC=log2ModuleProteins, Pvalue=PModuleProteins)
+    rownames(node.frame) <- 1:nrow(node.frame)
+    node.frame$InvPvalue <- 1 - PModuleProteins
+    write.table(node.frame, file=paste0('output/hotnet/nodes_', module, '.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
+    write.table(node.frame[, c('Symbol', 'InvPvalue')], file=paste0('output/hotnet/HotNet_input/g2s_Pval_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote     =FALSE)
+    names(namesModule) <- idsModule
+    
+    write.table(node.frame[, c('Symbol', 'LogFC')], file=paste0('output/hotnet/HotNet_input/g2s_log2_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    #nodeColorsModule <- node.colors[inModule]
+    
+    # Create empty dataframes
+    edges.matrix.1 <- data.frame(matrix(nrow=0, ncol=2))
+    #  edges.matrix.2 <- data.frame(matrix(nrow=0, ncol=2))
+    edges.matrix.1.num <- data.frame(matrix(nrow=0, ncol=2))
+    edges.matrix.2.num <- data.frame(matrix(nrow=0, ncol=2))
+    i2g.1 <- data.frame(matrix(nrow=0, ncol=2))
+    i2g.2 <- data.frame(matrix(nrow=0, ncol=2))
+    time2 <- Sys.time()
+    print("Slicing input:")
+    print(difftime(time2, time1, units="secs"))
+    # Write tables: one with edges between all nodes, one with a treshold of 0.05 and one with custom thresholds
+    for (i in 1:(nrow(TOMmodule)-1)){
+      for (j in (i+1):nrow(TOMmodule)){
+        if (TOMmodule[i,j] > cutOff){
+          # Add edge to list
+          edges.matrix.1[nrow(edges.matrix.1)+1,] <- c(namesModule[i],namesModule[j])
+          edges.matrix.1.num[nrow(edges.matrix.1.num)+1,] <- c(i,j)
+          # Add node to node list
+          if (!i %in% i2g.1[,1]){
+            i2g.1[nrow(i2g.1)+1,] <- c(i, namesModule[i])
+          }
+          if (!j %in% i2g.1[,1]){
+            i2g.1[nrow(i2g.1)+1,] <- c(j, namesModule[j])
+          }
+        }
+        #      if (TOMmodule[i,j] > 0.01){
+        #        # Add edge to list
+        #        edges.matrix.2[nrow(edges.matrix.2)+1,] <- c(namesModule[i],namesModule[j])
+        #        edges.matrix.2.num[nrow(edges.matrix.2.num)+1,] <- c(i,j)
+        #        # Add node to node list
+        #        if (!i %in% i2g.2[,1]){
+        #          i2g.2[nrow(i2g.2)+1,] <- c(i, namesModule[i])
+        #        }
+        #        if (!j %in% i2g.2[,1]){
+        #          i2g.2[nrow(i2g.2)+1,] <- c(j, namesModule[j])
+        #        }
+        #      }
+      }
+    }
+    time1 <- Sys.time()
+    write.table(edges.matrix.1, file=paste0('output/hotnet/HotNet_input/name_edges_expression_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    #  write.table(edges.matrix.2, file=paste0('output/hotnet/HotNet_input/name_edges_expression_001_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    write.table(edges.matrix.1.num, file=paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    #  write.table(edges.matrix.2.num, file=paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    write.table(i2g.1, file=paste0('output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    #  write.table(i2g.2, file=paste0('output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    time2 <- Sys.time()
+    print("Writing data:")
+    print(difftime(time2, time1, units="secs"))
   }
-  write.table(edges.matrix.1, file=paste0('output/hotnet/HotNet_input/name_edges_expression_003_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-  write.table(edges.matrix.2, file=paste0('output/hotnet/HotNet_input/name_edges_expression_001_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-  write.table(edges.matrix.1.num, file=paste0('output/hotnet/HotNet_input/edge_list_003_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-  write.table(edges.matrix.2.num, file=paste0('output/hotnet/HotNet_input/edge_list_001_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-  write.table(i2g.1, file=paste0('output/hotnet/HotNet_input/i2g_003_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-  write.table(i2g.2, file=paste0('output/hotnet/HotNet_input/i2g_001_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
 }
+
+#modulesHotNet <- c()
+#for (module in modules){
+#  if (file.info(paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv', sep=''))$size == 0){
+#    next
+#  }
+#  else {
+#    append(modulesHotNet, c(module))
+#  }
+#}
+#
+#print(modulesHotNet)
 
 
 ######### Run hierarchical hotnet to obtain the most significant submodule within each of the identified modules
 ######### Note that the HotNet package was written in Python and needs to be intstalled separately on your machine
-system(paste('bash', paste(argv[2],'/src/run_hierarchicalHotnet_modules.sh', sep="")))
+time1 <- Sys.time()
+system(paste('bash', paste(argv[2],'/src/run_hierarchicalHotnet_modules.sh "', sep=""), paste(modules, collapse=' '), '" ', cutOff))
 system('module load R')
+time2 <- Sys.time()
+print("Hierarchical HotNet:")
+difftime(time2, time1, units="secs")
 
-#GSEA
+time1 <- Sys.time()
+dir.create('figures/GO')
+#GO
 for (module in modules){
+  print(module)
+  if (module == "grey"){
+    next
+  } else{
     #Read in genes
-    inSubnetwork <- read.csv(paste('/output/hotnet/HotNet_results/consensus_nodes_log2_003_', module, sep=''), sep='/')
-    idsSubnetwork<- ids[inSubnetwork]
-    log2Subnetwork <- log2.SNV.WT[inSubnetwork]
-    geneList <- log2Subnetwork
-    PSubnetwork <- P.SNV.WT[inSubnetwork]
-    gsea <- gseGO(geneList=inSubnetwork, ont="BP", keyType = "SYMBOL", pvalueCutoff = 0.05, OrgDb=org.Hs.eg.db)
+    if (file.exists(paste('output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv', sep=''))){
+      if (file.info(paste('output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv', sep=''))$size == 0){
+        next
+      }
+      else {
+        inSubnetwork <- as.vector(t(read.csv(paste('output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv', sep=''), sep='\t', header = FALSE)[1,]))
+        log2Subnetwork <- log2vals[inSubnetwork]
+        PSubnetwork <- pvals[inSubnetwork]
+        geneNames <- mapIds(org.Hs.eg.db, keys = inSubnetwork, column = "ENTREZID", keytype = "SYMBOL")
+        if (is.null(geneNames)){
+          next
+        }
+        else {
+          go <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.2, OrgDb=org.Hs.eg.db)
+          png(file=paste0('figures/GO/GO_', module, '.png'), width=1920, height=1020)
+          barplot(go, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2)
+          dev.off()
+        }
+      }
+    }
+  }
 }
-
+time2 <- Sys.time()
+print("GO:")
+difftime(time2, time1, units="secs")
+endTime <- Sys.time()
+print("Total time:")
+difftime(endTime, startTime, units="secs")
 #######################################
 ###          Validation             ###
 #######################################
