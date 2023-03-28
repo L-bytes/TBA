@@ -19,6 +19,8 @@ library(clusterProfiler)
 library(ggplot2)
 library(pheatmap)
 library(RColorBrewer)
+library(foreach)
+library(doParallel)
 library(WGCNA)
 options(stringsAsFactors=FALSE)
 # Load required functions from the src directory
@@ -50,7 +52,7 @@ print("Loading data:")
 difftime(time2, time1, units="secs")
 
 time1 <- Sys.time()
-d <- d[1:1000,]
+#d <- d[1:10000,]
 d <- d[,colnames(d) %in% rownames(group.data)]
 group.data <- group.data[rownames(group.data) %in% colnames(d),]
 new_order <- sort(colnames(d))
@@ -59,32 +61,112 @@ new_order_rows <- sort(rownames(d))
 d <- d[new_order_rows,]
 d.raw <- d[,1:ncol(d)]
 d.raw <- apply(d.raw, c(1,2), as.numeric)
-# Get identifiers of genes
-ids <- rownames(d.raw)
+d.raw <- d.raw[rowSums(d.raw) >= 10,]
+samples <- colnames(d.raw)
 groups <- group.data$KRAS
-# colnames(d.raw) <- groups
-count.groups <- d.raw
-colnames(count.groups) <- groups
 # Save input data
-save(d.raw, group.data, groups, ids, file='rdata/input_data.RData')
+save(d.raw, group.data, groups, file='rdata/input_data.RData')
 time2 <- Sys.time()
 print("Processing data:")
 difftime(time2, time1, units="secs")
 
-png(file=paste0('figures/sampleCluster.png'), width=1920, height=1020)
-plotClusterTreeSamples(t(d.raw), groups, cex.lab = 2, cex.axis = 2, cex.main = 2)
+group.KRAS <- as.data.frame(group.data[,"KRAS"])
+rownames(group.KRAS) <- rownames(group.data)
+colnames(group.KRAS) <- c("KRAS")
+
+###PLOTS
+png(file=paste0('figures/heatmap.png'), width=1920, height=1020)
+pheatmap(d.raw, cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, show_colnames = FALSE, annotation_col=group.KRAS, cex.lab = 2, cex.axis = 2, cex.main = 2)
 dev.off()
 
+png(file=paste0('figures/sampleCluster.png'), width=1920, height=1020)
+plotClusterTreeSamples(t(d.raw), as.numeric(factor(groups)), cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+sampleDists <- dist(t(d.raw))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- colnames(d.raw)
+colnames(sampleDistMatrix) <- colnames(d.raw)
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+png(file=paste0('figures/sampleDistances.png'), width=1920, height=1020)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+par(mar = c(2, 1, 1, 1))
 png(file=paste0('figures/meanExpression.png'), width=1920, height=1020)
 barplot(apply(t(d.raw),1,mean, na.rm=T),
         xlab = "Sample", ylab = "Mean expression",
         main ="Mean expression across samples", cex.lab = 2, cex.axis = 2, cex.main = 2)
 dev.off()
 
+par(mar = c(1, 1, 1, 1))
 png(file=paste0('figures/variance.png'), width=1920, height=1020)
 meanSdPlot(d.raw, cex.lab = 2, cex.axis = 2, cex.main = 2)
 dev.off()
 
+###VST
+d.adj <- varianceStabilizingTransformation(d.raw, blind = F)
+
+###PLOTS AFTER VST
+png(file=paste0('figures/clusterSamplesVST.png'), width=1920, height=1020)
+#sampleTree <- plotClusterTreeSamples(t(d.adj), as.numeric(factor(groups)), cex.lab = 2, cex.axis = 2, cex.main = 2, cex.traitLabels = 2, cex.dendroLabels = 0.5)
+sampleTree <- hclust(dist(t(d.adj)), method = "ave")
+plot(sampleTree, main = "Sample clustering to detect outliers", sub="", xlab="", cex.lab = 1.5, cex.axis = 1.5, cex.main = 2)
+# Plot a line to show the cut
+abline(h = 225, col = "red");
+# Determine cluster under the line
+clust <- cutreeStatic(sampleTree, cutHeight = 250, minSize = 10)
+table(clust)
+# clust 1 contains the samples we want to keep.
+keepSamples <- (clust==1)
+dev.off()
+
+colnames(d.raw) <- samples
+d.raw <- d.raw[,keepSamples]
+samples <- colnames(d.raw)
+ids <- rownames(d.raw)
+group.data <- group.data[keepSamples,]
+groups <- group.data$KRAS
+d.adj <- d.adj[,keepSamples]
+colnames(d.adj) <- samples
+
+group.KRAS <- as.matrix(group.data[,"KRAS"])
+rownames(group.KRAS) <- rownames(group.data)
+colnames(group.KRAS) <- c("KRAS")
+
+png(file=paste0('figures/heatmapVST.png'), width=1920, height=1020)
+pheatmap(d.adj, cluster_rows=TRUE, show_colnames=FALSE, cluster_cols=TRUE, show_rownames = FALSE, annotation_col=as.data.frame(group.KRAS))
+dev.off()
+
+group.KRAS[,1] <- as.numeric(factor(group.KRAS[,1]))
+colnames(d.adj) <- groups
+
+par(mar = c(2, 1, 1, 1))
+png(file=paste0('figures/meanExpressionVST.png'), width=1920, height=1020)
+barplot(apply(t(d.adj),1,mean, na.rm=T),
+        xlab = "Sample", ylab = "Mean expression",
+        main ="Mean expression across samples", cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+par(mar = c(1, 1, 1, 1))
+png(file=paste0('figures/varianceVST.png'), width=1920, height=1020)
+meanSdPlot(d.adj, cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
+
+sampleDists <- dist(t(d.adj))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- colnames(d.adj)
+colnames(sampleDistMatrix) <- colnames(d.adj)
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+png(file=paste0('figures/sampleDistancesVST.png'), width=1920, height=1020)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
 
 
 #######################################
@@ -92,37 +174,27 @@ dev.off()
 #######################################
 #load(file='rdata/input_data.rdata')
 dir.create('figures/differential expression')
-d.norm <- normalize.sample(d.raw)
-d.cs <- normalize.cs(d.norm)
-length <- length(groups)
-# unique colnames in d.cs are necessary for clustering
-colnames(d.cs) <- paste(groups, 1:length, sep='_')
-# save input data into a file
-save(d.norm, d.cs, ids, groups, file='rdata/normalized_data.rdata')
+#d.norm <- normalize.sample(d.raw)
+#d.cs <- normalize.cs(d.norm)
+#length <- length(groups)
+## unique colnames in d.cs are necessary for clustering
+#colnames(d.cs) <- paste(groups, 1:length, sep='_')
+## save input data into a file
+#save(d.norm, d.cs, ids, groups, file='rdata/normalized_data.rdata')
 
 #DESeq2
 time1 <- Sys.time()
-group.KRAS <- as.matrix(group.data[,"KRAS"])
-rownames(group.KRAS) <- rownames(group.data)
-colnames(group.KRAS) <- c("KRAS")
-group.KRAS[,1] <- as.numeric(factor(group.KRAS[,1]))
 dds <- DESeqDataSetFromMatrix(countData = d.raw, colData = group.KRAS, design = ~ KRAS)
 dds
-keep <- rowSums(counts(dds)) >= 10
-dds <- dds[keep,]
 dds <- DESeq(dds)
 res <- results(dds)
 results.names <- resultsNames(dds)
 res
 results.names
+summary(res)
+
 colnames(d.raw) <- groups
-#Normalization
-d.adj <- assay(varianceStabilizingTransformation(dds, blind = F))
-colnames(d.adj) <- groups
-print(Sys.time())
-if (any(is.na(d.adj))){
-  print("NA present")
-}
+
 d.summary <- data.frame(unlist(res$log2FoldChange), unlist(res$padj), row.names = rownames(res))
 colnames(d.summary) <- c("log2FC", "Pvalue")
 d.summary <- na.omit(d.summary)
@@ -132,55 +204,22 @@ time2<- Sys.time()
 print("DESeq2:")
 difftime(time2, time1, units="secs")
 
-#Some plots
-png(file=paste0('figures/differential expression/clusterSamples.png'), width=1920, height=1020)
-plotClusterTreeSamples(t(d.adj), groups, cex.lab = 2, cex.axis = 2, cex.main = 2)
-dev.off()
-
-png(file=paste0('figures/differential expression/meanExpression.png'), width=1920, height=1020)
-barplot(apply(t(d.adj),1,mean, na.rm=T),
-        xlab = "Sample", ylab = "Mean expression",
-        main ="Mean expression across samples", cex.lab = 2, cex.axis = 2, cex.main = 2)
-dev.off()
-
-png(file=paste0('figures/differential expression/variance.png'), width=1920, height=1020)
-meanSdPlot(d.adj, cex.lab = 2, cex.axis = 2, cex.main = 2)
-dev.off()
-
+#S##DESEQ PLOTS
+par(mar = c(2, 1, 1, 1))
 png(file=paste0('figures/differential expression/MA.png'), width=1920, height=1020)
 plotMA(res, ylim=c(-2,2), cex.lab = 2, cex.axis = 2, cex.main = 2)
 dev.off()
 
 png(file=paste0('figures/differential expression/counts.png'), width=1920, height=1020)
-plotCounts(dds, gene=which.min(res$padj), intgroup="KRAS", cex.lab = 2, cex.axis = 2, cex.main = 2)
+plotCounts(dds, gene=which.max(res$log2FoldChange), intgroup="KRAS", cex.lab = 2, cex.axis = 2, cex.main = 2)
 dev.off()
 
-
-select <- order(rowMeans(counts(dds,normalized=TRUE)),
-                decreasing=TRUE)
-df <- as.data.frame(colData(dds)[,c("KRAS")])
-rownames(df) <- colnames(assay(dds)[select,])
-png(file=paste0('figures/differential expression/heatmap.png'), width=1920, height=1020)
-pheatmap(assay(dds)[select,], cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, annotation_col=df, cex.lab = 2, cex.axis = 2, cex.main = 2)
-dev.off()
-
-
-sampleDists <- dist(t(assay(dds)))
-sampleDistMatrix <- as.matrix(sampleDists)
-rownames(sampleDistMatrix) <- paste(dds$KRAS, sep="-")
-colnames(sampleDistMatrix) <- paste(dds$KRAS, sep="-")
-colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
-png(file=paste0('figures/differential expression/sampleDistances.png'), width=1920, height=1020)
-pheatmap(sampleDistMatrix,
-         clustering_distance_rows=sampleDists,
-         clustering_distance_cols=sampleDists,
-         col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2)
-dev.off()
-
+par(mar = c(1, 1, 1, 1))
 png(file=paste0('figures/differential expression/dispersion.png'), width=1920, height=1020)
 plotDispEsts(dds, cex.lab = 2, cex.axis = 2, cex.main = 2)
 dev.off()
 
+par(mar = c(2, 1, 1, 1))
 png(file=paste0('figures/differential expression/rejections.png'), width=1920, height=1020)
 plot(metadata(res)$filterNumRej, 
      type="b", ylab="number of rejections",
@@ -189,10 +228,12 @@ lines(metadata(res)$lo.fit, col="red")
 abline(v=metadata(res)$filterTheta)
 dev.off()
 
+par(mar = c(1, 1, 1, 1))
 png(file=paste0('figures/differential expression/outliers.png'), width=1920, height=1020)
-boxplot(log10(assays(dds)[["cooks"]]), range=0, las=2)
+boxplot(log10(assays(dds)[["cooks"]]), range=0, las=2, names = groups)
 dev.off()
 
+par(mar = c(2, 1, 1, 1))
 W <- res$stat
 maxCooks <- apply(assays(dds)[["cooks"]],1,max)
 idx <- !is.na(W)
@@ -318,26 +359,29 @@ hier2 <- hclust(as.dist(diss2), method="average")
 colorDynamicTOM <- labels2colors(cutreeDynamic(hier2,method="tree"))
 #restGenes <- (colorDynamicTOM != "grey")
 diag(diss2) = NA;
+moduleColors2 <- moduleColors[moduleColors != "grey"]
 
 #restGenes <- (colorDynamicTOM != "grey")
 #diss2 <- 1 - TOMsimilarityFromExpr(t(d.adj[restGenes,]), power = power)
 #hier2 <- hclust(as.dist(diss2), method="average" )
 #diag(diss2) = NA;
 
+par(mar = c(1, 1, 1, 1))
 png(file=paste0('figures/coexpression/TOMheatmap.png'), width=1920, height=1020)
-TOMplot(diss2^4, hier2, main = "TOM heatmap plot, module genes", terrainColors = FALSE, cex.lab = 2, cex.axis = 2, cex.main = 2)
+TOMplot(diss2^4, hier2, main = "TOM heatmap plot, module genes", terrainColors = FALSE, colors = moduleColors2, cex.lab = 2, cex.axis = 2, cex.main = 2)
 dev.off()
 
 png(file=paste0('figures/coexpression/networkHeatmap.png'), width=1920, height=1020)
 plotNetworkHeatmap(
   t(d.adj),
   ids,
-  useTOM = TRUE,
+  useTOM = FALSE,
   power = power,
   networkType = "unsigned",
   main = "Heatmap of the network")
 dev.off()
 
+par(mar = c(2, 1, 1, 1))
 png(file=paste0('figures/coexpression/moduleSignificance.png'), width=1920, height=1020)
 plotModuleSignificance(
   d.summary$Pvalue,
@@ -366,7 +410,7 @@ dev.off()
 GS1 <- as.numeric(cor(group.KRAS,t(d.adj[ids[moduleColors != "grey"],]), use="p"))
 GeneSignificance <- abs(GS1)
 ModuleSignificance <- tapply(GeneSignificance, colorDynamicTOM, mean, na.rm=T)
-png(file=paste0('figures/coexpression/moduleSignificance.png'), width=1920, height=1020)
+png(file=paste0('figures/coexpression/moduleSignificance2.png'), width=1920, height=1020)
 plotModuleSignificance(GeneSignificance,colorDynamicTOM, cex.lab = 2, cex.axis = 2, cex.main = 2)
 dev.off()
 
@@ -390,6 +434,12 @@ dir.create('output/hotnet/HotNet_input')
 cutOff <- quantile(as.vector(TOM), probs=0.95)
 print(cutOff)
 
+#Setup backend to use many processors
+#totalCores = detectCores()
+##Leave one core to avoid overload your computer
+#cluster <- makeCluster(totalCores[1]-1) 
+#registerDoParallel(cluster)
+
 # Get table with interactions for each module
 for (module in modules){
   if (module == "grey"){
@@ -398,6 +448,7 @@ for (module in modules){
   else {
     print(module)
     time1 <- Sys.time()
+    par(mar = c(1, 1, 1, 1))
     png(file=paste0('figures/coexpression/', module, '_matrix.png'), width=1920, height=1020)
     plotMat(t(scale(t(d.adj[colorDynamicTOM==module,]))),rlabels=T,
             clabels=T,rcols=module,
@@ -405,13 +456,12 @@ for (module in modules){
     dev.off()
     
     ME=datME[, paste("ME",module, sep="")]
-    par(mar=c(5, 4.2, 0, 0.7))
+    par(mar = c(2, 1, 1, 1))
     png(file=paste0('figures/coexpression/', module, '_ME.png'), width=1920, height=1020)
     barplot(ME, col=module, main="", cex.main=2,
             ylab="eigengene expression",xlab="array sample", cex.lab = 2, cex.axis = 2, cex.main = 2)
     dev.off()
     # Select proteins in module
-    moduleColors2 <- moduleColors[moduleColors != "grey"]
     inModule <- moduleColors2 == module
     sum(inModule)
     TOMmodule <- TOM[inModule, inModule]
@@ -429,9 +479,9 @@ for (module in modules){
     }
     node.frame <- data.frame(Symbol=idsModule, LogFC=log2ModuleProteins, Pvalue=PModuleProteins)
     rownames(node.frame) <- 1:nrow(node.frame)
-    node.frame$InvPvalue <- 1 - PModuleProteins
-    write.table(node.frame, file=paste0('output/hotnet/nodes_', module, '.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
-    write.table(node.frame[, c('Symbol', 'InvPvalue')], file=paste0('output/hotnet/HotNet_input/g2s_Pval_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote     =FALSE)
+    #node.frame$InvPvalue <- 1 - PModuleProteins
+    #write.table(node.frame, file=paste0('output/hotnet/nodes_', module, '.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
+    # write.table(node.frame[, c('Symbol', 'InvPvalue')], file=paste0('output/hotnet/HotNet_input/g2s_Pval_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote     =FALSE)
     names(namesModule) <- idsModule
     
     write.table(node.frame[, c('Symbol', 'LogFC')], file=paste0('output/hotnet/HotNet_input/g2s_log2_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
@@ -448,7 +498,9 @@ for (module in modules){
     print("Slicing input:")
     print(difftime(time2, time1, units="secs"))
     # Write tables: one with edges between all nodes, one with a treshold of 0.05 and one with custom thresholds
+    #foreach(i = 1:(nrow(TOMmodule)-1), j = (i+1):nrow(TOMmodule)) %dopar% {
     for (i in 1:(nrow(TOMmodule)-1)){
+      #foreach(j = (i+1):nrow(TOMmodule)) %dopar% {
       for (j in (i+1):nrow(TOMmodule)){
         if (TOMmodule[i,j] > cutOff){
           # Add edge to list
@@ -488,7 +540,7 @@ for (module in modules){
     print(difftime(time2, time1, units="secs"))
   }
 }
-
+#stopCluster(cluster)
 #modulesHotNet <- c()
 #for (module in modules){
 #  if (file.info(paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv', sep=''))$size == 0){
@@ -513,6 +565,7 @@ difftime(time2, time1, units="secs")
 
 time1 <- Sys.time()
 dir.create('figures/GO')
+
 #GO
 for (module in modules){
   print(module)
@@ -526,6 +579,7 @@ for (module in modules){
       }
       else {
         inSubnetwork <- as.vector(t(read.csv(paste('output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv', sep=''), sep='\t', header = FALSE)[1,]))
+        print(inSubnetwork)
         log2Subnetwork <- log2vals[inSubnetwork]
         PSubnetwork <- pvals[inSubnetwork]
         geneNames <- mapIds(org.Hs.eg.db, keys = inSubnetwork, column = "ENTREZID", keytype = "SYMBOL")
@@ -533,15 +587,41 @@ for (module in modules){
           next
         }
         else {
-          go <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.2, OrgDb=org.Hs.eg.db)
-          png(file=paste0('figures/GO/GO_', module, '.png'), width=1920, height=1020)
-          barplot(go, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2)
+          goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.2, OrgDb=org.Hs.eg.db)
+          goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.2, OrgDb=org.Hs.eg.db)
+          png(file=paste0('figures/GO/GOBPBar_', module, '.png'), width=1920, height=1020)
+          print(barplot(goBP, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
+          #dev.copy(png, paste0('figures/GO/GO_', module, '.png'))
+          dev.off()
+          png(file=paste0('figures/GO/GOBPNetwork_', module, '.png'), width=1920, height=1020)
+          print(goplot(goBP))
+          dev.off()
+          png(file=paste0('figures/GO/GOBPDot_', module, '.png'), width=1920, height=1020)
+          print(dotplot(goBP, showCategory=10))
+          dev.off()
+          terms <- goBP$Description[1:10]
+          png(file=paste0('figures/GO/GOBPPub_', module, '.png'), width=1920, height=1020)
+          print(pmcplot(terms, 2010:2022))
+          dev.off()
+          png(file=paste0('figures/GO/GOMFBar_', module, '.png'), width=1920, height=1020)
+          print(barplot(goMF, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
+          dev.off()
+          png(file=paste0('figures/GO/GOMFNetwork_', module, '.png'), width=1920, height=1020)
+          print(goplot(goMF))
+          dev.off()
+          png(file=paste0('figures/GO/GOMFDot_', module, '.png'), width=1920, height=1020)
+          print(dotplot(goMF, showCategory=10))
+          dev.off()
+          terms <- goMF$Description[1:10]
+          png(file=paste0('figures/GO/GOMFPub_', module, '.png'), width=1920, height=1020)
+          print(pmcplot(terms, 2010:2022))
           dev.off()
         }
       }
     }
   }
 }
+
 time2 <- Sys.time()
 print("GO:")
 difftime(time2, time1, units="secs")
