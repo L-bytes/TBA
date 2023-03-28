@@ -27,9 +27,11 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
   text(soft.tresh $fitIndices[,1], -sign(soft.tresh $fitIndices[,3])*soft.tresh $fitIndices[,2], labels=powers,cex=cex1,col="red")
   # this line corresponds to using an R^2 cut-off of h
   abline(h=0.90,col="red")
+  abline(h=0.80,col="blue")
   # Mean connectivity as a function of beta
   plot(soft.tresh $fitIndices[,1], soft.tresh $fitIndices[,5], xlab="Beta", ylab="Mean Connectivity", type="n", main = paste("Mean connectivity"))
   text(soft.tresh $fitIndices[,1], soft.tresh $fitIndices[,5], labels=powers, cex=cex1,col="red")
+  abline(h=150,col="red")
   dev.off()
   # If power not provided, pick from the scale independence analysis
   if (!power){
@@ -43,9 +45,9 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
   print(power)
   # Create network from chosen value of beta
   rownames(d) <- paste(rownames(d), length(groups), sep='_')
-  allowWGCNAThreads(nThreads = NULL)
-  enableWGCNAThreads(nThreads = NULL)
-  print(WGCNAnThreads())
+  # allowWGCNAThreads(nThreads = NULL)
+  # enableWGCNAThreads(nThreads = NULL)
+  # print(WGCNAnThreads())
   coex.net <- blockwiseModules(d, power=power,
                                TOMType="unsigned", minModuleSize=30,
                                reassignThreshold=0, mergeCutHeight=0.25,
@@ -77,9 +79,10 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
   for (i in 1:(n.modules-1)){
     module <- labels2colors(i)
     # Plot module eigengene expression
+    par(mar=c(2,1,1,1))
     png(paste0(figfolder, '/ME_distribution_', i, '_', module, '.png'), width=1920, height=1080)
     boxplot(ME.SNV[,paste0('ME', i)], ME.WT[,paste0('ME', i)], names=c('SNV', 'WT'),
-            col=module, xlab='group', ylab='ME value', cex.lab = 2, cex.axis = 2, cex.main = 2)
+            col=module, xlab='group', ylab='ME value', cex.lab = 2, cex.axis = 2, cex.main = 2, cex.colorLabels = 2)
     dev.off()
     # Calculate if distribution of log2FC values between the groups are significantly different from zero in each module
     #pval.modules <- data.frame()

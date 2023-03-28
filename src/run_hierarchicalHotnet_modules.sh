@@ -41,7 +41,7 @@ do
 	#
 	################################################################################
 	#echo "Creating input files..."
-	#python3.53 ../create_hotnet_input.py $data/edges_expression_"$thr".tsv $data/i2g_"$thr"_all.tsv $data/edge_list_"$thr"_all.tsv
+	#python3.53 ../create_hotnet_input.py $data/edges_expression_"$thr".tsv $data/i2g_all.tsv $data/edge_list_all.tsv
 	################################################################################
 	#
 	#   Construct similarity matrices.
@@ -50,9 +50,9 @@ do
 	echo "Construct similarity matrices..."
 	#echo $scripts/construct_similarity_matrix.py
 	python3.5 $scripts/construct_similarity_matrix.py \
-		-i   $data/edge_list_"$thr"_all.tsv \
-		-o   $intermediate/similarity_matrix_"$thr"_all.h5 \
-		-bof $intermediate/beta_"$thr"_all.txt
+		-i   $data/edge_list_all.tsv \
+		-o   $intermediate/similarity_matrix_all.h5 \
+		-bof $intermediate/beta_all.txt
 	################################################################################
 	#
 	#   Permute data.
@@ -65,17 +65,17 @@ do
 		echo $method
 		python3.5 $scripts/find_permutation_bins.py \
 			-gsf $data/g2s_"$method"_all.tsv \
-			-igf $data/i2g_"$thr"_all.tsv \
-			-elf $data/edge_list_"$thr"_all.tsv \
+			-igf $data/i2g_all.tsv \
+			-elf $data/edge_list_all.tsv \
 			-ms  1000 \
-			-o   $intermediate/score_bins_"$method"_"$thr"_all.tsv
+			-o   $intermediate/score_bins_"$method"_all.tsv
 		for i in `seq $num_permutations`
 		do
 			python3.5 $scripts/permute_scores.py \
 				-i  $data/g2s_"$method"_all.tsv \
-				-bf $intermediate/score_bins_"$method"_"$thr"_all.tsv \
+				-bf $intermediate/score_bins_"$method"_all.tsv \
 				-s  "$i" \
-				-o  $intermediate/scores_"$method"_"$thr"_all_"$i".tsv
+				-o  $intermediate/scores_"$method"_all_"$i".tsv
 		done
 		################################################################################
 		#
@@ -83,15 +83,15 @@ do
 		#
 		################################################################################
 		echo "Constructing hierarchies..."
-		cp $data/g2s_"$method"_all.tsv $intermediate/scores_"$method"_"$thr"_all_0.tsv
+		cp $data/g2s_"$method"_all.tsv $intermediate/scores_"$method"_all_0.tsv
 		for i in `seq 0 $num_permutations`
 		do
 			python3.5  $scripts/construct_hierarchy.py \
-				-smf  $intermediate/similarity_matrix_"$thr"_all.h5 \
-				-igf  $data/i2g_"$thr"_all.tsv \
-				-gsf  $intermediate/scores_"$method"_"$thr"_all_"$i".tsv \
-				-helf $intermediate/hierarchy_edge_list_"$method"_"$thr"_all_"$i".tsv \
-				-higf $intermediate/hierarchy_index_"$method"_"$thr"_all_gene_"$i".tsv
+				-smf  $intermediate/similarity_matrix_all.h5 \
+				-igf  $data/i2g_all.tsv \
+				-gsf  $intermediate/scores_"$method"_all_"$i".tsv \
+				-helf $intermediate/hierarchy_edge_list_"$method"_all_"$i".tsv \
+				-higf $intermediate/hierarchy_index_"$method"_all_gene_"$i".tsv
 			break
 		done
 		break
@@ -104,14 +104,14 @@ do
 		# This example uses -lsb/--lower_size_bound 1 because it is a small toy example
 		# with 25 vertices.  Use larger value (default is 10) for larger graphs.
 		python3.5  $scripts/process_hierarchies.py \
-			-oelf $intermediate/hierarchy_edge_list_"$method"_"$thr"_all_0.tsv \
-			-oigf $intermediate/hierarchy_index_"$method"_"$thr"_all_gene_0.tsv \
-			-pelf $(for i in `seq $num_permutations`; do echo " $intermediate/hierarchy_edge_list_"$method"_"$thr"_all_"$i".tsv "; done) \
-			-pigf $(for i in `seq $num_permutations`; do echo " $intermediate/hierarchy_index_"$method"_"$thr"_all_gene_"$i".tsv "; done) \
+			-oelf $intermediate/hierarchy_edge_list_"$method"_all_0.tsv \
+			-oigf $intermediate/hierarchy_index_"$method"_all_gene_0.tsv \
+			-pelf $(for i in `seq $num_permutations`; do echo " $intermediate/hierarchy_edge_list_"$method"_all_"$i".tsv "; done) \
+			-pigf $(for i in `seq $num_permutations`; do echo " $intermediate/hierarchy_index_"$method"_all_gene_"$i".tsv "; done) \
 			-lsb  5 \
-			-cf   $results/clusters_hierarchies_"$method"_"$thr"_all.tsv \
-			-pl   network_"$method"_"$thr"_all \
-			-pf   $results/sizes_network_"$method"_"$thr"_all.pdf
+			-cf   $results/clusters_hierarchies_"$method"_all.tsv \
+			-pl   network_"$method"_all \
+			-pf   $results/sizes_network_"$method"_all.pdf
 		################################################################################
 		#
 		#   Perform consensus.
@@ -119,14 +119,14 @@ do
 		################################################################################
 		echo "Performing consensus..."
 		python3.5  $scripts/perform_consensus.py \
-			-cf  $results/clusters_hierarchies_"$method"_"$thr"_all.tsv \
-			-igf $data/i2g_"$thr"_all.tsv \
-			-elf $data/edge_list_"$thr"_all.tsv \
-			-n   network_"$method"_"$thr"_all \
+			-cf  $results/clusters_hierarchies_"$method"_all.tsv \
+			-igf $data/i2g_all.tsv \
+			-elf $data/edge_list_all.tsv \
+			-n   network_"$method"_all \
 			-s   g2s_"$method"_all \
 			-t   1 \
-			-cnf $results/consensus_nodes_"$method"_"$thr"_all.tsv \
-			-cef $results/consensus_edges_"$method"_"$thr"_all.tsv
+			-cnf $results/consensus_nodes_"$method"_all.tsv \
+			-cef $results/consensus_edges_"$method"_all.tsv
 		################################################################################
 		#
 		#   Create output graph.
@@ -134,10 +134,10 @@ do
 		################################################################################
 		echo "Creating expression graph"
 		python3.5  $scripts/HotNet_graph_consensus.py \
-			-igf $data/i2g_"$thr"_"$module".tsv \
-			-elf $results/consensus_edges_"$method"_"$thr"_all.tsv \
+			-igf $data/i2g_"$module".tsv \
+			-elf $results/consensus_edges_"$method"_all.tsv \
 			-gsf $data/g2s_"$method"_"$module".tsv \
-			-pf $results/subnetworks_"$method"_"$thr"_all.png
+			-pf $results/subnetworks_"$method"_all.png
 		
 		break
 	done
@@ -164,7 +164,7 @@ do
   		################################################################################
   		#: '
   
-  		#python3.5 ../create_hotnet_input.py $data/name_edges_expression_"$thr"_"$module".tsv $data/i2g_"$thr"_"$module".tsv $data/edge_list_"$thr"_"$module".tsv
+  		#python3.5 ../create_hotnet_input.py $data/name_edges_expression_"$module".tsv $data/i2g_"$module".tsv $data/edge_list_"$module".tsv
   		################################################################################
   		#
   		#   Construct similarity matrices.
@@ -175,9 +175,9 @@ do
   
   		#echo $scripts/construct_similarity_matrix.py
   		python3.5 $scripts/construct_similarity_matrix.py \
-  			-i   $data/edge_list_"$thr"_"$module".tsv \
-  			-o   $intermediate/similarity_matrix_"$thr"_"$module".h5 \
-  			-bof $intermediate/beta_"$thr"_"$module".txt
+  			-i   $data/edge_list_"$module".tsv \
+  			-o   $intermediate/similarity_matrix_"$module".h5 \
+  			-bof $intermediate/beta_"$module".txt
   		
   		################################################################################
   		#
@@ -193,18 +193,18 @@ do
   			#: '
   			python3.5 $scripts/find_permutation_bins.py \
   				-gsf $data/g2s_"$method"_"$module".tsv \
-  				-igf $data/i2g_"$thr"_"$module".tsv \
-  				-elf $data/edge_list_"$thr"_"$module".tsv \
+  				-igf $data/i2g_"$module".tsv \
+  				-elf $data/edge_list_"$module".tsv \
   				-ms  10 \
-  				-o   $intermediate/score_bins_"$method"_"$thr"_"$module".tsv
+  				-o   $intermediate/score_bins_"$method"_"$module".tsv
   
   			for i in `seq $num_permutations`
   			do
   				python3.5 $scripts/permute_scores.py \
   					-i  $data/g2s_"$method"_"$module".tsv \
-  					-bf $intermediate/score_bins_"$method"_"$thr"_"$module".tsv \
+  					-bf $intermediate/score_bins_"$method"_"$module".tsv \
   					-s  "$i" \
-  					-o  $intermediate/scores_"$method"_"$thr"_"$module"_"$i".tsv
+  					-o  $intermediate/scores_"$method"_"$module"_"$i".tsv
   			done
   
   			################################################################################
@@ -214,16 +214,16 @@ do
   			################################################################################
   
   			echo "Constructing hierarchies..."
-  			cp $data/g2s_"$method"_"$module".tsv $intermediate/scores_"$method"_"$thr"_"$module"_0.tsv
+  			cp $data/g2s_"$method"_"$module".tsv $intermediate/scores_"$method"_"$module"_0.tsv
   
   			for i in `seq 0 $num_permutations`
   			do
   				python3.5  $scripts/construct_hierarchy.py \
-  					-smf  $intermediate/similarity_matrix_"$thr"_"$module".h5 \
-  					-igf  $data/i2g_"$thr"_"$module".tsv \
-  					-gsf  $intermediate/scores_"$method"_"$thr"_"$module"_"$i".tsv \
-  					-helf $intermediate/hierarchy_edge_list_"$method"_"$thr"_"$module"_"$i".tsv \
-  					-higf $intermediate/hierarchy_index_"$method"_"$thr"_"$module"_gene_"$i".tsv
+  					-smf  $intermediate/similarity_matrix_"$module".h5 \
+  					-igf  $data/i2g_"$module".tsv \
+  					-gsf  $intermediate/scores_"$method"_"$module"_"$i".tsv \
+  					-helf $intermediate/hierarchy_edge_list_"$method"_"$module"_"$i".tsv \
+  					-higf $intermediate/hierarchy_index_"$method"_"$module"_gene_"$i".tsv
   			done
   
   			################################################################################
@@ -236,14 +236,14 @@ do
   			# This example uses -lsb/--lower_size_bound 1 because it is a small toy example
   			# with 25 vertices.  Use larger value (default is 10) for larger graphs.
   			python3.5  $scripts/process_hierarchies.py \
-  				-oelf $intermediate/hierarchy_edge_list_"$method"_"$thr"_"$module"_0.tsv \
-  				-oigf $intermediate/hierarchy_index_"$method"_"$thr"_"$module"_gene_0.tsv \
-  				-pelf $(for i in `seq $num_permutations`; do echo " $intermediate/hierarchy_edge_list_"$method"_"$thr"_"$module"_"$i".tsv "; done) \
-  				-pigf $(for i in `seq $num_permutations`; do echo " $intermediate/hierarchy_index_"$method"_"$thr"_"$module"_gene_"$i".tsv "; done) \
+  				-oelf $intermediate/hierarchy_edge_list_"$method"_"$module"_0.tsv \
+  				-oigf $intermediate/hierarchy_index_"$method"_"$module"_gene_0.tsv \
+  				-pelf $(for i in `seq $num_permutations`; do echo " $intermediate/hierarchy_edge_list_"$method"_"$module"_"$i".tsv "; done) \
+  				-pigf $(for i in `seq $num_permutations`; do echo " $intermediate/hierarchy_index_"$method"_"$module"_gene_"$i".tsv "; done) \
   				-lsb  5 \
-  				-cf   $results/clusters_hierarchies_"$method"_"$thr"_"$module".tsv \
-  				-pl   network_"$method"_"$thr"_"$module" \
-  				-pf   $results/sizes_network_"$method"_"$thr"_"$module".pdf
+  				-cf   $results/clusters_hierarchies_"$method"_"$module".tsv \
+  				-pl   network_"$method"_"$module" \
+  				-pf   $results/sizes_network_"$method"_"$module".pdf
   
   			################################################################################
   			#
@@ -253,14 +253,14 @@ do
   
   			echo "Performing consensus..."
   			python3.5  $scripts/perform_consensus.py \
-  				-cf  $results/clusters_hierarchies_"$method"_"$thr"_"$module".tsv \
-  				-igf $data/i2g_"$thr"_"$module".tsv \
-  				-elf $data/edge_list_"$thr"_"$module".tsv \
-  				-n   network_"$method"_"$thr"_"$module" \
+  				-cf  $results/clusters_hierarchies_"$method"_"$module".tsv \
+  				-igf $data/i2g_"$module".tsv \
+  				-elf $data/edge_list_"$module".tsv \
+  				-n   network_"$method"_"$module" \
   				-s   g2s_"$method"_"$module" \
   				-t   1 \
-  				-cnf $results/consensus_nodes_"$method"_"$thr"_"$module".tsv \
-  				-cef $results/consensus_edges_"$method"_"$thr"_"$module".tsv
+  				-cnf $results/consensus_nodes_"$method"_"$module".tsv \
+  				-cef $results/consensus_edges_"$method"_"$module".tsv
   
   			################################################################################
   			#
@@ -270,10 +270,10 @@ do
   			#'
   			echo "Creating expression graph..."
   			python3.5  $scripts/HotNet_graph_consensus.py \
-  				-igf $data/i2g_"$thr"_"$module".tsv \
-  				-elf $results/consensus_edges_"$method"_"$thr"_"$module".tsv \
+  				-igf $data/i2g_"$module".tsv \
+  				-elf $results/consensus_edges_"$method"_"$module".tsv \
   				-gsf $data/g2s_"$method"_"$module".tsv \
-  				-pf $results/subnetworks_"$method"_"$thr"_"$module".png
+  				-pf $results/subnetworks_"$method"_"$module".png
   		done
   	done
   fi
