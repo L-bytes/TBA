@@ -20,6 +20,8 @@ library(clusterProfiler)
 library(ggplot2)
 library(pheatmap)
 library(RColorBrewer)
+library(enrichplot)
+library(europepmc)
 library(WGCNA)
 options(stringsAsFactors=FALSE)
 # Load required functions from the src directory
@@ -51,7 +53,7 @@ print("Loading data:")
 difftime(time2, time1, units="secs")
 
 time1 <- Sys.time()
-d <- d[1:5000,]
+d <- d[1:10000,]
 d <- d[,colnames(d) %in% rownames(group.data)]
 group.data <- group.data[rownames(group.data) %in% colnames(d),]
 new_order <- sort(colnames(d))
@@ -63,8 +65,6 @@ d.raw <- apply(d.raw, c(1,2), as.numeric)
 d.raw <- d.raw[rowSums(d.raw) >= 10,]
 samples <- colnames(d.raw)
 groups <- group.data$KRAS
-# Save input data
-save(d.raw, group.data, groups, file='rdata/input_data.RData')
 time2 <- Sys.time()
 print("Processing data:")
 difftime(time2, time1, units="secs")
@@ -77,6 +77,8 @@ colnames(group.KRAS) <- c("KRAS")
 png(file=paste0('figures/heatmap.png'), width=1920, height=1020)
 pheatmap(d.raw, cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, show_colnames = FALSE, annotation_col=group.KRAS, cex.lab = 2, cex.axis = 2, cex.main = 2)
 dev.off()
+
+colnames(d.raw) <- groups
 
 png(file=paste0('figures/sampleCluster.png'), width=1920, height=1020)
 plotClusterTreeSamples(t(d.raw), as.numeric(factor(groups)), cex.lab = 2, cex.axis = 2, cex.main = 2)
@@ -91,7 +93,7 @@ png(file=paste0('figures/sampleDistances.png'), width=1920, height=1020)
 pheatmap(sampleDistMatrix,
          clustering_distance_rows=sampleDists,
          clustering_distance_cols=sampleDists,
-         col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2)
+         col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
 dev.off()
 
 par(mar = c(2, 1, 1, 1))
@@ -109,13 +111,21 @@ dev.off()
 ###VST
 d.adj <- varianceStabilizingTransformation(d.raw, blind = F)
 
+colnames(d.raw) <- samples
+
 ###PLOTS AFTER VST
+#dds <- DESeqDataSetFromMatrix(countData = d.raw, colData = group.KRAS, design = ~ KRAS)
+#dds
+#dds2 <- estimateSizeFactors(dds)
+#d.norm <- counts(dds2, normalized = TRUE)
+
 png(file=paste0('figures/clusterSamplesVST.png'), width=1920, height=1020)
-#sampleTree <- plotClusterTreeSamples(t(d.adj), as.numeric(factor(groups)), cex.lab = 2, cex.axis = 2, cex.main = 2, cex.traitLabels = 2, cex.dendroLabels = 0.5)
 sampleTree <- hclust(dist(t(d.adj)), method = "ave")
+#png(file=paste0('figures/clusterSamplesNorm.png'), width=1920, height=1020)
+#sampleTree <- hclust(dist(t(d.norm)), method = "ave")
 plot(sampleTree, main = "Sample clustering to detect outliers", sub="", xlab="", cex.lab = 1.5, cex.axis = 1.5, cex.main = 2)
 # Plot a line to show the cut
-abline(h = 225, col = "red");
+abline(h = 250, col = "red");
 # Determine cluster under the line
 clust <- cutreeStatic(sampleTree, cutHeight = 250, minSize = 10)
 table(clust)
@@ -131,10 +141,41 @@ group.data <- group.data[keepSamples,]
 groups <- group.data$KRAS
 d.adj <- d.adj[,keepSamples]
 colnames(d.adj) <- samples
+#d.norm <- d.norm[,keepSamples]
+#colnames(d.norm) <- samples
 
 group.KRAS <- as.matrix(group.data[,"KRAS"])
 rownames(group.KRAS) <- rownames(group.data)
 colnames(group.KRAS) <- c("KRAS")
+
+#png(file=paste0('figures/heatmapNorm.png'), width=1920, height=1020)
+#pheatmap(d.norm, cluster_rows=TRUE, show_colnames=FALSE, cluster_cols=TRUE, show_rownames = FALSE, annotation_col=as.data.frame(group.KRAS))
+#dev.off()
+#
+#colnames(d.norm) <- groups
+#
+#sampleDists <- dist(t(d.norm))
+#sampleDistMatrix <- as.matrix(sampleDists)
+#rownames(sampleDistMatrix) <- colnames(d.norm)
+#colnames(sampleDistMatrix) <- colnames(d.norm)
+#colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+#png(file=paste0('figures/sampleDistancesNorm.png'), width=1920, height=1020)
+#pheatmap(sampleDistMatrix,
+#         clustering_distance_rows=sampleDists,
+#         clustering_distance_cols=sampleDists,
+#         col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
+#dev.off()
+#
+#par(mar = c(2, 1, 1, 1))
+#png(file=paste0('figures/meanExpressionNorm.png'), width=1920, height=1020)
+#barplot(apply(t(d.norm),1,mean, na.rm=T),
+#        xlab = "Sample", ylab = "Mean expression",
+#        main ="Mean expression across samples", cex.lab = 2, cex.axis = 2, cex.main = 2)
+#dev.off()
+
+png(file=paste0('figures/sampleClusterVST.png'), width=1920, height=1020)
+plotClusterTreeSamples(t(d.adj), as.numeric(factor(groups)), cex.lab = 2, cex.axis = 2, cex.main = 2)
+dev.off()
 
 png(file=paste0('figures/heatmapVST.png'), width=1920, height=1020)
 pheatmap(d.adj, cluster_rows=TRUE, show_colnames=FALSE, cluster_cols=TRUE, show_rownames = FALSE, annotation_col=as.data.frame(group.KRAS))
@@ -164,22 +205,22 @@ png(file=paste0('figures/sampleDistancesVST.png'), width=1920, height=1020)
 pheatmap(sampleDistMatrix,
          clustering_distance_rows=sampleDists,
          clustering_distance_cols=sampleDists,
-         col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2)
+         col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
 dev.off()
 
-
+save(d.raw, d.adj, d.norm, group.KRAS, group.data, groups, samples, ids, file='rdata/input_data.RData')
 #######################################
 ###         Preprocessing           ###
 #######################################
 #load(file='rdata/input_data.rdata')
 dir.create('figures/differential expression')
-# d.norm <- normalize.sample(d.raw)
-# d.cs <- normalize.cs(d.norm)
-# length <- length(groups)
-# # unique colnames in d.cs are necessary for clustering
-# colnames(d.cs) <- paste(groups, 1:length, sep='_')
-# # save input data into a file
-# save(d.norm, d.cs, ids, groups, file='rdata/normalized_data.rdata')
+#d.norm <- normalize.sample(d.raw)
+#d.cs <- normalize.cs(d.norm)
+#length <- length(groups)
+## unique colnames in d.cs are necessary for clustering
+#colnames(d.cs) <- paste(groups, 1:length, sep='_')
+## save input data into a file
+#save(d.norm, d.cs, ids, groups, file='rdata/normalized_data.rdata')
 
 #DESeq2
 time1 <- Sys.time()
@@ -199,11 +240,13 @@ colnames(d.summary) <- c("log2FC", "Pvalue")
 d.summary <- na.omit(d.summary)
 d.adj <- d.adj[rownames(d.adj) %in% rownames(d.summary),]
 ids <- rownames(d.adj)
+#d.norm <- d.norm[rownames(d.norm) %in% rownames(d.summary),]
+#ids <- rownames(d.norm)
 time2<- Sys.time()
 print("DESeq2:")
 difftime(time2, time1, units="secs")
 
-#S##DESEQ PLOTS
+###DESEQ PLOTS
 par(mar = c(2, 1, 1, 1))
 png(file=paste0('figures/differential expression/MA.png'), width=1920, height=1020)
 plotMA(res, ylim=c(-2,2), cex.lab = 2, cex.axis = 2, cex.main = 2)
@@ -257,6 +300,7 @@ text(x = c(0, length(h1$counts)), y = 0, label = paste(c(0,1)),
 legend("topright", fill=rev(colori), legend=rev(names(colori)))
 dev.off()
 
+save(d.summary, d.adj, ids, dds, res, file='rdata/deseq2.rdata')
 #######################################
 ### Differential expression analysis###
 #######################################
@@ -351,7 +395,7 @@ P.SNV.WT <- d.summary$Pvalue
 # Save data structures
 # save(wgcna.net, GOenr.net, module.significance, ids, file='rdata/coexpression.RData')
 
-###WGCNA PLOTS
+### PLOTS
 TOM <- TOMsimilarityFromExpr(t(d.adj[ids[moduleColors != "grey"],]), power=power, TOMType="unsigned")
 diss2 <- 1-TOM
 hier2 <- hclust(as.dist(diss2), method="average")
@@ -415,13 +459,13 @@ dev.off()
 
 disableWGCNAThreads()
 
-
-#######################################
-###       Hierarchical HotNet       ###
-#######################################
-### Run hierarchical hotnet to obtain the most significant submodule within each of the identified modules
-### Note that the HotNet package was written in Python and needs to be intstalled separately on your machine
-### HotNet was run mostly with default parameters
+save(coexpression, TOM, colorDynamicTOM, datME, file='rdata/coexpression.RData')
+########################################
+####       Hierarchical HotNet       ###
+########################################
+#### Run hierarchical hotnet to obtain the most significant submodule within each of the identified modules
+#### Note that the HotNet package was written in Python and needs to be intstalled separately on your machine
+#### HotNet was run mostly with default parameters
 #load(file='rdata/input_data.RData')
 #load(file='rdata/normalized_data.RData')
 #load(file='rdata/differential_expression.RData')
@@ -430,14 +474,14 @@ dir.create('figures/hotnet')
 dir.create('output/hotnet')
 dir.create('output/hotnet/HotNet_input')
 
-cutOff <- quantile(as.vector(TOM), probs=0.95)
+cutOff <- quantile(as.vector(TOM), probs=0.99)
 print(cutOff)
 
 #Setup backend to use many processors
-#totalCores = detectCores()
+totalCores = detectCores()
 #Leave one core to avoid overload your computer
-#cluster <- makeCluster(totalCores[1]-1) 
-#registerDoParallel(cluster)
+cluster <- makeCluster(totalCores[1]-1)
+registerDoParallel(cluster)
 
 # Get table with interactions for each module
 for (module in modules){
@@ -446,7 +490,6 @@ for (module in modules){
   } 
   else {
     print(module)
-    time1 <- Sys.time()
     par(mar = c(1, 1, 1, 1))
     png(file=paste0('figures/coexpression/', module, '_matrix.png'), width=1920, height=1020)
     plotMat(t(scale(t(d.adj[colorDynamicTOM==module,]))),rlabels=T,
@@ -487,30 +530,49 @@ for (module in modules){
     #nodeColorsModule <- node.colors[inModule]
     
     # Create empty dataframes
+    time1 <- Sys.time()
     edges.matrix.1 <- data.frame(matrix(nrow=0, ncol=2))
     #  edges.matrix.2 <- data.frame(matrix(nrow=0, ncol=2))
     edges.matrix.1.num <- data.frame(matrix(nrow=0, ncol=2))
     edges.matrix.2.num <- data.frame(matrix(nrow=0, ncol=2))
     i2g.1 <- data.frame(matrix(nrow=0, ncol=2))
     i2g.2 <- data.frame(matrix(nrow=0, ncol=2))
-    time2 <- Sys.time()
-    print("Slicing input:")
-    print(difftime(time2, time1, units="secs"))
+    no <- nrow(TOMmodule)
     # Write tables: one with edges between all nodes, one with a treshold of 0.05 and one with custom thresholds
-    #foreach(i = 1:(nrow(TOMmodule)-1)) %dopar% {
-    for (i in 1:(nrow(TOMmodule)-1)){
-      #foreach(j = (i+1):nrow(TOMmodule)) %dopar% {
-      for (j in (i+1):nrow(TOMmodule)){
+    #result = foreach(i = 1:(nrow(TOMmodule)-1), j = (i+1):nrow(TOMmodule)) %dopar% {
+    combine <- function(x,y){
+      x1 <- rbind(x[[1]], y[[1]])
+      y1 <- rbind(x[[2]], y[[2]])
+      z1 <- rbind(x[[3]], y[[3]])
+      #z <- rbind(x[[3]], y[[3]])
+      return(list(x1,y1,z1))
+    }
+    result <- foreach(i = 1:(no-1), .combine = 'combine', .inorder=TRUE) %dopar% {
+      # result = foreach(j = (i+1):nrow(TOMmodule), .combine = 'rbind') %dopar% {
+      result1 <- data.frame(matrix(nrow=0,ncol=2))
+      result2 <- data.frame(matrix(nrow=0,ncol=2))
+      result3 <- data.frame(matrix(nrow=0,ncol=2))
+      for (j in (i+1):no){
         if (TOMmodule[i,j] > cutOff){
           # Add edge to list
-          edges.matrix.1[nrow(edges.matrix.1)+1,] <- c(namesModule[i],namesModule[j])
-          edges.matrix.1.num[nrow(edges.matrix.1.num)+1,] <- c(i,j)
+          # edges.matrix.1[nrow(edges.matrix.1)+1,] <- c(namesModule[i],namesModule[j])
+          # edges.matrix.1.num[nrow(edges.matrix.1.num)+1,] <- c(i,j)
+          result1[nrow(result1)+1,] <- c(namesModule[i], namesModule[j])
+          #rbind(result1, c(namesModule[i], namesModule[j]))
+          result2[nrow(result2)+1,] <- c(i,j)
+          #rbind(result2, c(i,j))
           # Add node to node list
-          if (!i %in% i2g.1[,1]){
-            i2g.1[nrow(i2g.1)+1,] <- c(i, namesModule[i])
-          }
-          if (!j %in% i2g.1[,1]){
-            i2g.1[nrow(i2g.1)+1,] <- c(j, namesModule[j])
+          if (!i %in% result3[,1]){
+            #i2g.1[nrow(i2g.1)+1,] <- c(i, namesModule[i])
+            #rbind(result3, c(i, namesModule[i]))
+            result3[nrow(result3)+1,] <- c(i, namesModule[i])
+            #c(c(namesModule[i],namesModule[j]), c(i, j), c(i, namesModule[i]))
+          } 
+          if (!j %in% result3[,1]){
+            #i2g.1[nrow(i2g.1)+1,] <- c(j, namesModule[j])
+            #rbind(result3, c(j, namesModule[j]))
+            result3[nrow(result3)+1,] <- c(j, namesModule[j])
+            #c(c(namesModule[i],namesModule[j]), c(i, j), c(j, namesModule[j]))
           }
         }
         #      if (TOMmodule[i,j] > 0.01){
@@ -526,20 +588,29 @@ for (module in modules){
         #        }
         #      }
       }
+      return(list(result1, result2, result3))
+      # if(!is.null(result)){
+      #   rbind(edges.matrix.1, result[,1])
+      #   rbind(edges.matrix.1.num, result[,2])
+      #   rbind(i2g.1, result[,3])
     }
+    print(result[[3]])
+    time2 <- Sys.time()
+    print("Slicing input:")
+    print(difftime(time2, time1, units="secs"))
     time1 <- Sys.time()
-    write.table(edges.matrix.1, file=paste0('output/hotnet/HotNet_input/name_edges_expression_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    write.table(result[[1]], file=paste0('output/hotnet/HotNet_input/name_edges_expression_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
     #  write.table(edges.matrix.2, file=paste0('output/hotnet/HotNet_input/name_edges_expression_001_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-    write.table(edges.matrix.1.num, file=paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    write.table(result[[2]], file=paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
     #  write.table(edges.matrix.2.num, file=paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-    write.table(i2g.1, file=paste0('output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    write.table(result[[3]], file=paste0('output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
     #  write.table(i2g.2, file=paste0('output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
     time2 <- Sys.time()
     print("Writing data:")
     print(difftime(time2, time1, units="secs"))
   }
 }
-#stopCluster(cluster)
+stopCluster(cluster)
 #modulesHotNet <- c()
 #for (module in modules){
 #  if (file.info(paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv', sep=''))$size == 0){
@@ -551,20 +622,6 @@ for (module in modules){
 #}
 #
 #print(modulesHotNet)
-
-#modulesHotNet <- c()
-#for (module in modules){
-#  if (file.info(paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv', sep=''))$size == 0){
-#    next
-#  }
-#  else {
-#    append(modulesHotNet, c(module))
-#  }
-#}
-#
-#print(modulesHotNet)
-
-
 ######### Run hierarchical hotnet to obtain the most significant submodule within each of the identified modules
 ######### Note that the HotNet package was written in Python and needs to be intstalled separately on your machine
 time1 <- Sys.time()
@@ -578,59 +635,71 @@ dir.create('figures/GO')
 
 #GO
 for (module in modules){
-  print(module)
   if (module == "grey"){
-    next
-  } else{
-    #Read in genes
-    if (file.exists(paste('output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv', sep=''))){
-      if (file.info(paste('output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv', sep=''))$size == 0){
-        next
-      }
-      else {
-        inSubnetwork <- as.vector(t(read.csv(paste('output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv', sep=''), sep='\t', header = FALSE)[1,]))
-        print(inSubnetwork)
-        log2Subnetwork <- log2vals[inSubnetwork]
-        PSubnetwork <- pvals[inSubnetwork]
-        geneNames <- mapIds(org.Hs.eg.db, keys = inSubnetwork, column = "ENTREZID", keytype = "SYMBOL")
-        if (is.null(geneNames)){
+   next
+  }
+  else{
+    p <- read.table(file=paste0('output/hotnet/HotNet_results/clusters_hierarchies_log2_', module, '.tsv'), sep='\t', header= FALSE, comment.char="")[6, "V1"]
+    p <- as.numeric(sub(".*: ", "", p))
+    if (p > 0.1){
+      next
+    }
+    else{
+      #Read in genes
+      if (file.exists(paste('output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv', sep=''))){
+        if (file.info(paste('output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv', sep=''))$size == 0){
           next
         }
         else {
-          goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.2, OrgDb=org.Hs.eg.db)
-          goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.2, OrgDb=org.Hs.eg.db)
-          png(file=paste0('figures/GO/GOBPBar_', module, '.png'), width=1920, height=1020)
-          print(barplot(goBP, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
-          #dev.copy(png, paste0('figures/GO/GO_', module, '.png'))
-          dev.off()
-          png(file=paste0('figures/GO/GOBPNetwork_', module, '.png'), width=1920, height=1020)
-          print(goplot(goBP))
-          dev.off()
-          png(file=paste0('figures/GO/GOBPDot_', module, '.png'), width=1920, height=1020)
-          print(dotplot(goBP, showCategory=10))
-          dev.off()
-          terms <- goBP$Description[1:10]
-          png(file=paste0('figures/GO/GOBPPub_', module, '.png'), width=1920, height=1020)
-          print(pmcplot(terms, 2010:2022))
-          dev.off()
-          png(file=paste0('figures/GO/GOMFBar_', module, '.png'), width=1920, height=1020)
-          print(barplot(goMF, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
-          dev.off()
-          png(file=paste0('figures/GO/GOMFNetwork_', module, '.png'), width=1920, height=1020)
-          print(goplot(goMF))
-          dev.off()
-          png(file=paste0('figures/GO/GOMFDot_', module, '.png'), width=1920, height=1020)
-          print(dotplot(goMF, showCategory=10))
-          dev.off()
-          terms <- goMF$Description[1:10]
-          png(file=paste0('figures/GO/GOMFPub_', module, '.png'), width=1920, height=1020)
-          print(pmcplot(terms, 2010:2022))
-          dev.off()
+          inSubnetwork <- as.vector(t(read.csv(paste('output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv', sep=''), sep='\t', header = FALSE)[1,]))
+          print(inSubnetwork)
+          log2Subnetwork <- log2vals[inSubnetwork]
+          PSubnetwork <- pvals[inSubnetwork]
+          geneNames <- mapIds(org.Hs.eg.db, keys = inSubnetwork, column = "ENTREZID", keytype = "SYMBOL")
+          if (is.null(geneNames)){
+            next
+          }
+          else {
+            print(module)
+            goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db, minGSSize = 3)
+            goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db, minGSSize = 3)
+            if (any(goBP@result[["p.adjust"]]) <= 0.1){
+              png(file=paste0('figures/GO/GOBPBar_', module, '.png'), width=1920, height=1020)
+              print(barplot(goBP, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
+              dev.off()
+              png(file=paste0('figures/GO/GOBPNetwork_', module, '.png'), width=1920, height=1020)
+              print(goplot(goBP))
+              dev.off()
+              png(file=paste0('figures/GO/GOBPDot_', module, '.png'), width=1920, height=1020)
+              print(dotplot(goBP, showCategory=10))
+              dev.off()
+              terms <- goBP$Description[1:10]
+              png(file=paste0('figures/GO/GOBPPub_', module, '.png'), width=1920, height=1020)
+              print(pmcplot(terms, 2010:2022))
+              dev.off()
+            }
+            if (any(goMF@result[["p.adjust"]]) <= 0.1){
+              png(file=paste0('figures/GO/GOMFBar_', module, '.png'), width=1920, height=1020)
+              print(barplot(goMF, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
+              dev.off()
+              png(file=paste0('figures/GO/GOMFNetwork_', module, '.png'), width=1920, height=1020)
+              print(goplot(goMF))
+              dev.off()
+              png(file=paste0('figures/GO/GOMFDot_', module, '.png'), width=1920, height=1020)
+              print(dotplot(goMF, showCategory=10))
+              dev.off()
+              terms <- goMF$Description[1:10]
+              png(file=paste0('figures/GO/GOMFPub_', module, '.png'), width=1920, height=1020)
+              print(pmcplot(terms, 2010:2022))
+              dev.off()
+            }
+          }
         }
       }
-    }
+    }  
   }
 }
+
 time2 <- Sys.time()
 print("GO:")
 difftime(time2, time1, units="secs")
