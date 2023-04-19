@@ -65,6 +65,8 @@ d.raw <- apply(d.raw, c(1,2), as.numeric)
 d.raw <- d.raw[rowSums(d.raw) >= 10,]
 samples <- colnames(d.raw)
 groups <- group.data$KRAS
+# Save input data
+save(d.raw, group.data, groups, file='rdata/input_data.RData')
 time2 <- Sys.time()
 print("Processing data:")
 difftime(time2, time1, units="secs")
@@ -119,6 +121,8 @@ colnames(d.raw) <- samples
 #dds2 <- estimateSizeFactors(dds)
 #d.norm <- counts(dds2, normalized = TRUE)
 
+colnames(d.raw) <- groups
+
 png(file=paste0('figures/clusterSamplesVST.png'), width=1920, height=1020)
 sampleTree <- hclust(dist(t(d.adj)), method = "ave")
 #png(file=paste0('figures/clusterSamplesNorm.png'), width=1920, height=1020)
@@ -128,6 +132,7 @@ plot(sampleTree, main = "Sample clustering to detect outliers", sub="", xlab="",
 abline(h = 250, col = "red");
 # Determine cluster under the line
 clust <- cutreeStatic(sampleTree, cutHeight = 250, minSize = 10)
+#clust <- cutreeStatic(sampleTree, cutHeight = 2250000, minSize = 10)
 table(clust)
 # clust 1 contains the samples we want to keep.
 keepSamples <- (clust==1)
@@ -148,7 +153,7 @@ group.KRAS <- as.matrix(group.data[,"KRAS"])
 rownames(group.KRAS) <- rownames(group.data)
 colnames(group.KRAS) <- c("KRAS")
 
-#png(file=paste0('figures/heatmapNorm.png'), width=1920, height=1020)
+png(file=paste0('figures/heatmapNorm.png'), width=1920, height=1020)
 #pheatmap(d.norm, cluster_rows=TRUE, show_colnames=FALSE, cluster_cols=TRUE, show_rownames = FALSE, annotation_col=as.data.frame(group.KRAS))
 #dev.off()
 #
@@ -208,7 +213,8 @@ pheatmap(sampleDistMatrix,
          col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
 dev.off()
 
-save(d.raw, d.adj, d.norm, group.KRAS, group.data, groups, samples, ids, file='rdata/input_data.RData')
+save(d.raw, d.adj, group.KRAS, group.data, groups, samples, ids, file='rdata/input_data.RData')
+
 #######################################
 ###         Preprocessing           ###
 #######################################
@@ -388,15 +394,16 @@ names(pvals) <- ids
 # Module labels and log2 values
 moduleColors <- labels2colors(wgcna.net$colors)
 modules <- levels(as.factor(moduleColors))
-log2.SNV.WT <- d.summary$log2FC
-P.SNV.WT <- d.summary$Pvalue
+ids <- ids[moduleColors != "grey"]
+log2.SNV.WT <- d.summary[ids, "log2FC"]
+P.SNV.WT <- d.summary[ids, "Pvalue"]
 #gns<-mapIds(org.Hs.eg.db, keys = ids, column = "ENTREZID", keytype = "SYMBOL")
 # GOenr.net <- GO.terms.modules(wgcna.net, ids, log2vals, gns, 'figures/coexpression', 'output/coexpression')
 # Save data structures
 # save(wgcna.net, GOenr.net, module.significance, ids, file='rdata/coexpression.RData')
 
 ### PLOTS
-TOM <- TOMsimilarityFromExpr(t(d.adj[ids[moduleColors != "grey"],]), power=power, TOMType="unsigned")
+TOM <- TOMsimilarityFromExpr(t(d.adj[ids,]), power=power, TOMType="unsigned")
 diss2 <- 1-TOM
 hier2 <- hclust(as.dist(diss2), method="average")
 colorDynamicTOM <- labels2colors(cutreeDynamic(hier2,method="tree"))
@@ -416,7 +423,7 @@ dev.off()
 
 png(file=paste0('figures/coexpression/networkHeatmap.png'), width=1920, height=1020)
 plotNetworkHeatmap(
-  t(d.adj),
+  t(d.adj[ids,]),
   ids,
   useTOM = FALSE,
   power = power,
@@ -427,14 +434,14 @@ dev.off()
 par(mar = c(2, 1, 1, 1))
 png(file=paste0('figures/coexpression/moduleSignificance.png'), width=1920, height=1020)
 plotModuleSignificance(
-  d.summary$Pvalue,
-  labels2colors(wgcna.net$colors),
+  d.summary[ids, "Pvalue"],
+  moduleColors2,
   boxplot = FALSE,
   main = "Gene significance across modules,",
   ylab = "Gene Significance", cex.lab = 2, cex.axis = 2, cex.main = 2)
 dev.off()
 
-datME <- moduleEigengenes(t(d.adj[ids[moduleColors != "grey"],]),colorDynamicTOM)$eigengenes
+datME <- moduleEigengenes(t(d.adj[ids,]),colorDynamicTOM)$eigengenes
 dissimME <- (1-t(cor(datME, method="p")))/2
 hclustdatME <- hclust(as.dist(dissimME), method="average" )
 # Plot the eigengene dendrogram
@@ -450,7 +457,7 @@ dev.off()
 #  clusterMEs = TRUE)
 #dev.off()
 
-GS1 <- as.numeric(cor(group.KRAS,t(d.adj[ids[moduleColors != "grey"],]), use="p"))
+GS1 <- as.numeric(cor(group.KRAS,t(d.adj[ids,]), use="p"))
 GeneSignificance <- abs(GS1)
 ModuleSignificance <- tapply(GeneSignificance, colorDynamicTOM, mean, na.rm=T)
 png(file=paste0('figures/coexpression/moduleSignificance2.png'), width=1920, height=1020)
@@ -511,12 +518,10 @@ for (module in modules){
     log2ModuleProteins <- log2.SNV.WT[inModule]
     PModuleProteins <- P.SNV.WT[inModule]
     
-    # Convert Uniprot IDs to Gene symbols
-    namesModule <- idsModule
-    for (i in 1:length(namesModule)){
+    for (i in 1:length(idsModule)){
       # If there is no gene name associated with the Uniprot ID, keep the uniprot ID
-      if (is.na(namesModule[i])){
-        namesModule[i] <- idsModule[i]
+      if (is.na(idsModule[i])){
+        idsModule[i] <- idsModule[i]
       }
     }
     node.frame <- data.frame(Symbol=idsModule, LogFC=log2ModuleProteins, Pvalue=PModuleProteins)
@@ -524,7 +529,7 @@ for (module in modules){
     #node.frame$InvPvalue <- 1 - PModuleProteins
     #write.table(node.frame, file=paste0('output/hotnet/nodes_', module, '.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
     # write.table(node.frame[, c('Symbol', 'InvPvalue')], file=paste0('output/hotnet/HotNet_input/g2s_Pval_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote     =FALSE)
-    names(namesModule) <- idsModule
+    names(idsModule) <- idsModule
     
     write.table(node.frame[, c('Symbol', 'LogFC')], file=paste0('output/hotnet/HotNet_input/g2s_log2_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
     #nodeColorsModule <- node.colors[inModule]
@@ -537,63 +542,197 @@ for (module in modules){
     edges.matrix.2.num <- data.frame(matrix(nrow=0, ncol=2))
     i2g.1 <- data.frame(matrix(nrow=0, ncol=2))
     i2g.2 <- data.frame(matrix(nrow=0, ncol=2))
-    no <- nrow(TOMmodule)
+    writeLines(c(""), "log.txt")
     # Write tables: one with edges between all nodes, one with a treshold of 0.05 and one with custom thresholds
     #result = foreach(i = 1:(nrow(TOMmodule)-1), j = (i+1):nrow(TOMmodule)) %dopar% {
     combine <- function(x,y){
+      #names(x[[3]]) <- names(y[[3]])
       x1 <- rbind(x[[1]], y[[1]])
       y1 <- rbind(x[[2]], y[[2]])
       z1 <- rbind(x[[3]], y[[3]])
-      #z <- rbind(x[[3]], y[[3]])
+      z1 <- z1[!duplicated(z1), ]
       return(list(x1,y1,z1))
     }
-    result <- foreach(i = 1:(no-1), .combine = 'combine', .inorder=TRUE) %dopar% {
+    
+    result <- foreach(i = 1:(nrow(TOMmodule)-1), .combine = 'combine', .inorder = FALSE) %:%
       # result = foreach(j = (i+1):nrow(TOMmodule), .combine = 'rbind') %dopar% {
-      result1 <- data.frame(matrix(nrow=0,ncol=2))
-      result2 <- data.frame(matrix(nrow=0,ncol=2))
-      result3 <- data.frame(matrix(nrow=0,ncol=2))
-      for (j in (i+1):no){
-        if (TOMmodule[i,j] > cutOff){
-          # Add edge to list
-          # edges.matrix.1[nrow(edges.matrix.1)+1,] <- c(namesModule[i],namesModule[j])
-          # edges.matrix.1.num[nrow(edges.matrix.1.num)+1,] <- c(i,j)
-          result1[nrow(result1)+1,] <- c(namesModule[i], namesModule[j])
-          #rbind(result1, c(namesModule[i], namesModule[j]))
-          result2[nrow(result2)+1,] <- c(i,j)
-          #rbind(result2, c(i,j))
-          # Add node to node list
-          if (!i %in% result3[,1]){
-            #i2g.1[nrow(i2g.1)+1,] <- c(i, namesModule[i])
-            #rbind(result3, c(i, namesModule[i]))
-            result3[nrow(result3)+1,] <- c(i, namesModule[i])
-            #c(c(namesModule[i],namesModule[j]), c(i, j), c(i, namesModule[i]))
-          } 
-          if (!j %in% result3[,1]){
-            #i2g.1[nrow(i2g.1)+1,] <- c(j, namesModule[j])
-            #rbind(result3, c(j, namesModule[j]))
-            result3[nrow(result3)+1,] <- c(j, namesModule[j])
-            #c(c(namesModule[i],namesModule[j]), c(i, j), c(j, namesModule[j]))
-          }
-        }
-        #      if (TOMmodule[i,j] > 0.01){
-        #        # Add edge to list
-        #        edges.matrix.2[nrow(edges.matrix.2)+1,] <- c(namesModule[i],namesModule[j])
-        #        edges.matrix.2.num[nrow(edges.matrix.2.num)+1,] <- c(i,j)
-        #        # Add node to node list
-        #        if (!i %in% i2g.2[,1]){
-        #          i2g.2[nrow(i2g.2)+1,] <- c(i, namesModule[i])
-        #        }
-        #        if (!j %in% i2g.2[,1]){
-        #          i2g.2[nrow(i2g.2)+1,] <- c(j, namesModule[j])
-        #        }
-        #      }
+      # result1 <- data.frame(matrix(nrow=0,ncol=2))
+      # result2 <- data.frame(matrix(nrow=0,ncol=2))
+      # result3 <- data.frame(matrix(nrow=0,ncol=2))
+      #for (j in (i+1):nrow(TOMmodule)){
+      foreach(j = (i+1):nrow(TOMmodule), .combine = 'combine', .inorder = FALSE) %dopar% {
+        # if (TOMmodule[i,j] > cutOff){
+        #   # Add edge to list
+        #   # edges.matrix.1[nrow(edges.matrix.1)+1,] <- c(idsModule[i],idsModule[j])
+        #   # edges.matrix.1.num[nrow(edges.matrix.1.num)+1,] <- c(i,j)
+        #   result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
+        #   #rbind(result1, c(idsModule[i], idsModule[j]))
+        #   result2[nrow(result2)+1,] <- c(i,j)
+        #   #rbind(result2, c(i,j))
+        #   # Add node to node list
+        #   if (!i %in% result3[,1]){
+        #     #i2g.1[nrow(i2g.1)+1,] <- c(i, idsModule[i])
+        #     #rbind(result3, c(i, idsModule[i]))
+        #     result3[nrow(result3)+1,] <- c(i, idsModule[i])
+        #     #c(c(idsModule[i],idsModule[j]), c(i, j), c(i, idsModule[i]))
+        #   } 
+        #   if (!j %in% result3[,1]){
+        #     #i2g.1[nrow(i2g.1)+1,] <- c(j, idsModule[j])
+        #     #rbind(result3, c(j, idsModule[j]))
+        #     result3[nrow(result3)+1,] <- c(j, idsModule[j])
+        #     #c(c(idsModule[i],idsModule[j]), c(i, j), c(j, idsModule[j]))
+        #   }
+        # result = foreach(j = (i+1):nrow(TOMmodule), .combine = 'rbind') %dopar% {
+        # result1 <- data.frame(matrix(nrow=0,ncol=2))
+        # result2 <- data.frame(matrix(nrow=0,ncol=2))
+        # result3 <- data.frame(matrix(nrow=0,ncol=2))
+        # result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
+        # result2[nrow(result2)+1,] <- c(i,j)
+        # result3[nrow(result3)+1,] <- c(i, idsModule[i])
+        # result3[nrow(result3)+1,] <- c(j, idsModule[j])
+        return(list(data.frame(matrix(c(idsModule[i], idsModule[j]), ncol=2)), data.frame(matrix(c(i, j), ncol=2)), data.frame(rbind(c(i, idsModule[i]), c(j, idsModule[j])), ncol=2)))
       }
-      return(list(result1, result2, result3))
+      #return(list(result1, result2, result3))
       # if(!is.null(result)){
       #   rbind(edges.matrix.1, result[,1])
       #   rbind(edges.matrix.1.num, result[,2])
       #   rbind(i2g.1, result[,3])
+    print(result[[3]])
+    time2 <- Sys.time()
+    print("Slicing input:")
+    print(difftime(time2, time1, units="secs"))
+    time1 <- Sys.time()
+    write.table(result[[1]], file=paste0('output/hotnet/HotNet_input/name_edges_expression_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    #  write.table(edges.matrix.2, file=paste0('output/hotnet/HotNet_input/name_edges_expression_001_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    write.table(result[[2]], file=paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    #  write.table(edges.matrix.2.num, file=paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    write.table(result[[3]], file=paste0('output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    #  write.table(i2g.2, file=paste0('output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    time2 <- Sys.time()
+    print("Writing data:")
+    print(difftime(time2, time1, units="secs"))
+  }
+}
+stopCluster(cluster)
+# Get table with interactions for each module
+for (module in modules){
+  if (module == "grey"){
+    next
+  } 
+  else {
+    print(module)
+    par(mar = c(1, 1, 1, 1))
+    png(file=paste0('figures/coexpression/', module, '_matrix.png'), width=1920, height=1020)
+    plotMat(t(scale(t(d.adj[colorDynamicTOM==module,]))),rlabels=T,
+            clabels=T,rcols=module,
+            title=module, cex.lab = 2, cex.axis = 2, cex.main = 2)
+    dev.off()
+    
+    ME=datME[, paste("ME",module, sep="")]
+    par(mar = c(2, 1, 1, 1))
+    png(file=paste0('figures/coexpression/', module, '_ME.png'), width=1920, height=1020)
+    barplot(ME, col=module, main="", cex.main=2,
+            ylab="eigengene expression",xlab="array sample", cex.lab = 2, cex.axis = 2, cex.main = 2)
+    dev.off()
+    # Select proteins in module
+    inModule <- moduleColors2 == module
+    sum(inModule)
+    TOMmodule <- TOM[inModule, inModule]
+    idsModule <- ids[inModule]
+    log2ModuleProteins <- log2.SNV.WT[inModule]
+    PModuleProteins <- P.SNV.WT[inModule]
+    
+    for (i in 1:length(idsModule)){
+      # If there is no gene name associated with the Uniprot ID, keep the uniprot ID
+      if (is.na(idsModule[i])){
+        idsModule[i] <- idsModule[i]
+      }
     }
+    node.frame <- data.frame(Symbol=idsModule, LogFC=log2ModuleProteins, Pvalue=PModuleProteins)
+    rownames(node.frame) <- 1:nrow(node.frame)
+    #node.frame$InvPvalue <- 1 - PModuleProteins
+    #write.table(node.frame, file=paste0('output/hotnet/nodes_', module, '.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
+    # write.table(node.frame[, c('Symbol', 'InvPvalue')], file=paste0('output/hotnet/HotNet_input/g2s_Pval_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote     =FALSE)
+    names(idsModule) <- idsModule
+    
+    write.table(node.frame[, c('Symbol', 'LogFC')], file=paste0('output/hotnet/HotNet_input/g2s_log2_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    #nodeColorsModule <- node.colors[inModule]
+    
+    # Create empty dataframes
+    time1 <- Sys.time()
+    edges.matrix.1 <- data.frame(matrix(nrow=0, ncol=2))
+    #  edges.matrix.2 <- data.frame(matrix(nrow=0, ncol=2))
+    edges.matrix.1.num <- data.frame(matrix(nrow=0, ncol=2))
+    edges.matrix.2.num <- data.frame(matrix(nrow=0, ncol=2))
+    i2g.1 <- data.frame(matrix(nrow=0, ncol=2))
+    i2g.2 <- data.frame(matrix(nrow=0, ncol=2))
+    writeLines(c(""), "log.txt")
+    # Write tables: one with edges between all nodes, one with a treshold of 0.05 and one with custom thresholds
+    #result = foreach(i = 1:(nrow(TOMmodule)-1), j = (i+1):nrow(TOMmodule)) %dopar% {
+    combine <- function(x,y){
+      #names(x[[3]]) <- names(y[[3]])
+      x1 <- rbind(x[[1]], y[[1]])
+      y1 <- rbind(x[[2]], y[[2]])
+      z1 <- rbind(x[[3]], y[[3]])
+      z1 <- z1[!duplicated(z1), ]
+      return(list(x1,y1,z1))
+    }
+    
+    result <- foreach(i = 1:(nrow(TOMmodule)-1), .combine = 'combine', .inorder = FALSE) %:%
+      # result = foreach(j = (i+1):nrow(TOMmodule), .combine = 'rbind') %dopar% {
+      # result1 <- data.frame(matrix(nrow=0,ncol=2))
+      # result2 <- data.frame(matrix(nrow=0,ncol=2))
+      # result3 <- data.frame(matrix(nrow=0,ncol=2))
+      #for (j in (i+1):nrow(TOMmodule)){
+      foreach(j = (i+1):nrow(TOMmodule), .combine = 'combine', .inorder = FALSE) %dopar% {
+        # if (TOMmodule[i,j] > cutOff){
+        #   # Add edge to list
+        #   # edges.matrix.1[nrow(edges.matrix.1)+1,] <- c(idsModule[i],idsModule[j])
+        #   # edges.matrix.1.num[nrow(edges.matrix.1.num)+1,] <- c(i,j)
+        #   result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
+        #   #rbind(result1, c(idsModule[i], idsModule[j]))
+        #   result2[nrow(result2)+1,] <- c(i,j)
+        #   #rbind(result2, c(i,j))
+        #   # Add node to node list
+        #   if (!i %in% result3[,1]){
+        #     #i2g.1[nrow(i2g.1)+1,] <- c(i, idsModule[i])
+        #     #rbind(result3, c(i, idsModule[i]))
+        #     result3[nrow(result3)+1,] <- c(i, idsModule[i])
+        #     #c(c(idsModule[i],idsModule[j]), c(i, j), c(i, idsModule[i]))
+        #   } 
+        #   if (!j %in% result3[,1]){
+        #     #i2g.1[nrow(i2g.1)+1,] <- c(j, idsModule[j])
+        #     #rbind(result3, c(j, idsModule[j]))
+        #     result3[nrow(result3)+1,] <- c(j, idsModule[j])
+        #     #c(c(idsModule[i],idsModule[j]), c(i, j), c(j, idsModule[j]))
+        #   }
+        # result = foreach(j = (i+1):nrow(TOMmodule), .combine = 'rbind') %dopar% {
+        # result1 <- data.frame(matrix(nrow=0,ncol=2))
+        # result2 <- data.frame(matrix(nrow=0,ncol=2))
+        result3 <- data.frame(matrix(nrow=0,ncol=2))
+        # result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
+        # result2[nrow(result2)+1,] <- c(i,j)
+        result3[nrow(result3)+1,] <- c(i, idsModule[i])
+        result3[nrow(result3)+1,] <- c(j, idsModule[j])
+        return(list(data.frame(matrix(c(idsModule[i], idsModule[j]), ncol=2)), data.frame(matrix(c(i, j), ncol=2)), result3))
+      }
+        #      if (TOMmodule[i,j] > 0.01){
+        #        # Add edge to list
+        #        edges.matrix.2[nrow(edges.matrix.2)+1,] <- c(idsModule[i],idsModule[j])
+        #        edges.matrix.2.num[nrow(edges.matrix.2.num)+1,] <- c(i,j)
+        #        # Add node to node list
+        #        if (!i %in% i2g.2[,1]){
+        #          i2g.2[nrow(i2g.2)+1,] <- c(i, idsModule[i])
+        #        }
+        #        if (!j %in% i2g.2[,1]){
+        #          i2g.2[nrow(i2g.2)+1,] <- c(j, idsModule[j])
+        #        }
+        #      }
+      #return(list(result1, result2, result3))
+      # if(!is.null(result)){
+      #   rbind(edges.matrix.1, result[,1])
+      #   rbind(edges.matrix.1.num, result[,2])
+      #   rbind(i2g.1, result[,3])
     print(result[[3]])
     time2 <- Sys.time()
     print("Slicing input:")
