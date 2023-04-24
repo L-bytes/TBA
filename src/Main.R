@@ -542,7 +542,6 @@ for (module in modules){
     edges.matrix.2.num <- data.frame(matrix(nrow=0, ncol=2))
     i2g.1 <- data.frame(matrix(nrow=0, ncol=2))
     i2g.2 <- data.frame(matrix(nrow=0, ncol=2))
-    writeLines(c(""), "log.txt")
     # Write tables: one with edges between all nodes, one with a treshold of 0.05 and one with custom thresholds
     #result = foreach(i = 1:(nrow(TOMmodule)-1), j = (i+1):nrow(TOMmodule)) %dopar% {
     combine <- function(x,y){
@@ -554,49 +553,37 @@ for (module in modules){
       return(list(x1,y1,z1))
     }
     
-    result <- foreach(i = 1:(nrow(TOMmodule)-1), .combine = 'combine', .inorder = FALSE) %:%
+    result <- foreach(i = 1:(nrow(TOMmodule)-1), .combine = 'combine', .inorder = TRUE) %dopar% {
       # result = foreach(j = (i+1):nrow(TOMmodule), .combine = 'rbind') %dopar% {
-      # result1 <- data.frame(matrix(nrow=0,ncol=2))
-      # result2 <- data.frame(matrix(nrow=0,ncol=2))
-      # result3 <- data.frame(matrix(nrow=0,ncol=2))
-      #for (j in (i+1):nrow(TOMmodule)){
-      foreach(j = (i+1):nrow(TOMmodule), .combine = 'combine', .inorder = FALSE) %dopar% {
-        # if (TOMmodule[i,j] > cutOff){
+      result1 <- data.frame(matrix(nrow=0,ncol=2))
+      result2 <- data.frame(matrix(nrow=0,ncol=2))
+      result3 <- data.frame(matrix(nrow=0,ncol=2))
+      for (j in (i+1):nrow(TOMmodule)){
+      #foreach(j = (i+1):nrow(TOMmodule), .combine = 'combine', .inorder = FALSE) %dopar% {
+        if (TOMmodule[i,j] > cutOff){
         #   # Add edge to list
-        #   # edges.matrix.1[nrow(edges.matrix.1)+1,] <- c(idsModule[i],idsModule[j])
-        #   # edges.matrix.1.num[nrow(edges.matrix.1.num)+1,] <- c(i,j)
-        #   result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
-        #   #rbind(result1, c(idsModule[i], idsModule[j]))
-        #   result2[nrow(result2)+1,] <- c(i,j)
-        #   #rbind(result2, c(i,j))
+        # edges.matrix.1[nrow(edges.matrix.1)+1,] <- c(idsModule[i],idsModule[j])
+        # edges.matrix.1.num[nrow(edges.matrix.1.num)+1,] <- c(i,j)
+          result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
+          result2[nrow(result2)+1,] <- c(i,j)
         #   # Add node to node list
-        #   if (!i %in% result3[,1]){
-        #     #i2g.1[nrow(i2g.1)+1,] <- c(i, idsModule[i])
-        #     #rbind(result3, c(i, idsModule[i]))
-        #     result3[nrow(result3)+1,] <- c(i, idsModule[i])
-        #     #c(c(idsModule[i],idsModule[j]), c(i, j), c(i, idsModule[i]))
-        #   } 
-        #   if (!j %in% result3[,1]){
-        #     #i2g.1[nrow(i2g.1)+1,] <- c(j, idsModule[j])
-        #     #rbind(result3, c(j, idsModule[j]))
-        #     result3[nrow(result3)+1,] <- c(j, idsModule[j])
-        #     #c(c(idsModule[i],idsModule[j]), c(i, j), c(j, idsModule[j]))
-        #   }
-        # result = foreach(j = (i+1):nrow(TOMmodule), .combine = 'rbind') %dopar% {
-        # result1 <- data.frame(matrix(nrow=0,ncol=2))
-        # result2 <- data.frame(matrix(nrow=0,ncol=2))
-        # result3 <- data.frame(matrix(nrow=0,ncol=2))
-        # result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
-        # result2[nrow(result2)+1,] <- c(i,j)
-        # result3[nrow(result3)+1,] <- c(i, idsModule[i])
-        # result3[nrow(result3)+1,] <- c(j, idsModule[j])
-        return(list(data.frame(matrix(c(idsModule[i], idsModule[j]), ncol=2)), data.frame(matrix(c(i, j), ncol=2)), data.frame(rbind(c(i, idsModule[i]), c(j, idsModule[j])), ncol=2)))
+          if (!i %in% result3[,1]){
+          #     #i2g.1[nrow(i2g.1)+1,] <- c(i, idsModule[i])
+            result3[nrow(result3)+1,] <- c(i, idsModule[i])
+          } 
+          if (!j %in% result3[,1]){
+          #     #i2g.1[nrow(i2g.1)+1,] <- c(j, idsModule[j])
+            result3[nrow(result3)+1,] <- c(j, idsModule[j])
+          }
+        #return(list(data.frame(matrix(c(idsModule[i], idsModule[j]), ncol=2)), data.frame(matrix(c(i, j), ncol=2)), data.frame(rbind(c(i, idsModule[i]), c(j, idsModule[j])), ncol=2)))
+        }
       }
-      #return(list(result1, result2, result3))
-      # if(!is.null(result)){
-      #   rbind(edges.matrix.1, result[,1])
-      #   rbind(edges.matrix.1.num, result[,2])
-      #   rbind(i2g.1, result[,3])
+      return(list(result1, result2, result3))
+    }
+    # if(!is.null(result)){
+    #   rbind(edges.matrix.1, result[,1])
+    #   rbind(edges.matrix.1.num, result[,2])
+    #   rbind(i2g.1, result[,3])
     print(result[[3]])
     time2 <- Sys.time()
     print("Slicing input:")
@@ -670,7 +657,7 @@ for (module in modules){
     # Write tables: one with edges between all nodes, one with a treshold of 0.05 and one with custom thresholds
     #result = foreach(i = 1:(nrow(TOMmodule)-1), j = (i+1):nrow(TOMmodule)) %dopar% {
     combine <- function(x,y){
-      #names(x[[3]]) <- names(y[[3]])
+      names(x[[3]]) <- names(y[[3]])
       x1 <- rbind(x[[1]], y[[1]])
       y1 <- rbind(x[[2]], y[[2]])
       z1 <- rbind(x[[3]], y[[3]])
@@ -709,13 +696,12 @@ for (module in modules){
         # result = foreach(j = (i+1):nrow(TOMmodule), .combine = 'rbind') %dopar% {
         # result1 <- data.frame(matrix(nrow=0,ncol=2))
         # result2 <- data.frame(matrix(nrow=0,ncol=2))
-        result3 <- data.frame(matrix(nrow=0,ncol=2))
+        #result3 <- data.frame(matrix(nrow=0,ncol=2))
         # result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
         # result2[nrow(result2)+1,] <- c(i,j)
-        result3[nrow(result3)+1,] <- c(i, idsModule[i])
-        result3[nrow(result3)+1,] <- c(j, idsModule[j])
-        return(list(data.frame(matrix(c(idsModule[i], idsModule[j]), ncol=2)), data.frame(matrix(c(i, j), ncol=2)), result3))
-      }
+        # result3[nrow(result3)+1,] <- c(i, idsModule[i])
+        # result3[nrow(result3)+1,] <- c(j, idsModule[j])
+        return(list(data.frame(matrix(c(idsModule[i], idsModule[j]), ncol=2)), data.frame(matrix(c(i, j), ncol=2)), data.frame(rbind(c(i, idsModule[i]), c(j, idsModule[j])), ncol=2)))      }
         #      if (TOMmodule[i,j] > 0.01){
         #        # Add edge to list
         #        edges.matrix.2[nrow(edges.matrix.2)+1,] <- c(idsModule[i],idsModule[j])
