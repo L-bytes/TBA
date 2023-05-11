@@ -53,7 +53,7 @@ print("Loading data:")
 difftime(time2, time1, units="secs")
 
 time1 <- Sys.time()
-d <- d[1:10000,]
+#d <- d[1:5000,]
 d <- d[,colnames(d) %in% rownames(group.data)]
 group.data <- group.data[rownames(group.data) %in% colnames(d),]
 new_order <- sort(colnames(d))
@@ -112,8 +112,13 @@ dev.off()
 
 ###VST
 d.adj <- varianceStabilizingTransformation(d.raw, blind = F)
+#d.adj <- rlog(d.raw, blind=FALSE)
 
 colnames(d.raw) <- samples
+
+#ddds <- DESeqDataSetFromMatrix(countData = d.raw, colData = group.KRAS, design = ~ KRAS)
+#ntd <- normTransform(ddds)
+#d.adj <- assay(ddds)
 
 ###PLOTS AFTER VST
 #dds <- DESeqDataSetFromMatrix(countData = d.raw, colData = group.KRAS, design = ~ KRAS)
@@ -213,7 +218,6 @@ pheatmap(sampleDistMatrix,
          col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
 dev.off()
 
-save(d.raw, d.adj, group.KRAS, group.data, groups, samples, ids, file='rdata/input_data.RData')
 
 #######################################
 ###         Preprocessing           ###
@@ -234,6 +238,10 @@ dds <- DESeqDataSetFromMatrix(countData = d.raw, colData = group.KRAS, design = 
 dds
 dds <- DESeq(dds)
 res <- results(dds)
+#cooks <- assays(dds)[["cooks"]]
+#png(file=paste0('figures/differential expression/cooksCheck.png'), width=1920, height=1020)
+#plot(x = rownames(cooks), y = cooks, type = "h")
+#dev.off()
 results.names <- resultsNames(dds)
 res
 results.names
@@ -306,7 +314,6 @@ text(x = c(0, length(h1$counts)), y = 0, label = paste(c(0,1)),
 legend("topright", fill=rev(colori), legend=rev(names(colori)))
 dev.off()
 
-save(d.summary, d.adj, ids, dds, res, file='rdata/deseq2.rdata')
 #######################################
 ### Differential expression analysis###
 #######################################
@@ -387,18 +394,16 @@ print("WGCNA:")
 difftime(time2, time1, units="secs")
 # Merge M18 (lightgreen) into M9 (magenta), since they were highly similar
 #wgcna.net$colors <- replace(wgcna.net$colors, wgcna.net$colors==18, 9)
-log2vals <- d.summary$log2FC
-names(log2vals) <- ids
-pvals <- d.summary$Pvalue
-names(pvals) <- ids
 # Module labels and log2 values
 moduleColors <- labels2colors(wgcna.net$colors)
 modules <- levels(as.factor(moduleColors))
-ids <- ids[moduleColors != "grey"]
-log2.SNV.WT <- d.summary[ids, "log2FC"]
-P.SNV.WT <- d.summary[ids, "Pvalue"]
 #gns<-mapIds(org.Hs.eg.db, keys = ids, column = "ENTREZID", keytype = "SYMBOL")
-# GOenr.net <- GO.terms.modules(wgcna.net, ids, log2vals, gns, 'figures/coexpression', 'output/coexpression')
+#GOenr.net <- GO.terms.modules(wgcna.net, ids, log2vals, gns, 'figures/coexpression', 'output/coexpression')
+ids <- ids[moduleColors != "grey"]
+log2vals <- d.summary[ids, "log2FC"]
+pvals <- d.summary[ids, "Pvalue"]
+names(log2vals) <- ids
+names(pvals) <- ids
 # Save data structures
 # save(wgcna.net, GOenr.net, module.significance, ids, file='rdata/coexpression.RData')
 
@@ -442,7 +447,7 @@ plotModuleSignificance(
 dev.off()
 
 datME <- moduleEigengenes(t(d.adj[ids,]),colorDynamicTOM)$eigengenes
-dissimME <- (1-t(cor(datME, method="p")))/2
+dissimME <- (1-t(cor(datME, use="p")))/2
 hclustdatME <- hclust(as.dist(dissimME), method="average" )
 # Plot the eigengene dendrogram
 png(file=paste0('figures/coexpression/moduleEigengenes.png'), width=1920, height=1020)
@@ -457,7 +462,7 @@ dev.off()
 #  clusterMEs = TRUE)
 #dev.off()
 
-GS1 <- as.numeric(cor(group.KRAS,t(d.adj[ids,]), use="p"))
+GS1 <- as.numeric(cor(group.KRAS,t(d.adj[ids,])))
 GeneSignificance <- abs(GS1)
 ModuleSignificance <- tapply(GeneSignificance, colorDynamicTOM, mean, na.rm=T)
 png(file=paste0('figures/coexpression/moduleSignificance2.png'), width=1920, height=1020)
@@ -466,7 +471,16 @@ dev.off()
 
 disableWGCNAThreads()
 
-save(coexpression, TOM, colorDynamicTOM, datME, file='rdata/coexpression.RData')
+MEs <- orderMEs(datME)
+modNames <- substring(names(MEs), 3)
+geneModuleMembership <- as.data.frame(cor(t(d.adj[ids,]), MEs, use = "p"));
+names(geneModuleMembership) <- paste("MM", modNames, sep="");
+GS1 <- as.data.frame(GS1)
+names(GS1) = paste("GS.", names(groups), sep="")
+
+corPVal <- corAndPvalue(t(d.adj[ids,]), use="pairwise.complete.obs")
+
+
 ########################################
 ####       Hierarchical HotNet       ###
 ########################################
@@ -481,8 +495,20 @@ dir.create('figures/hotnet')
 dir.create('output/hotnet')
 dir.create('output/hotnet/HotNet_input')
 
-cutOff <- quantile(as.vector(TOM), probs=0.99)
-print(cutOff)
+corN <- corPVal[["cor"]]
+corN <- corN[corN < 0]
+corP <- corPVal[["cor"]]
+corP <- corP[corP > 0]
+
+cutOff <- quantile(as.vector(TOM), probs=0.9)
+print(paste("90th quantile: ", cutOff))
+
+cutOffN <- quantile(as.vector(corN), probs=0.1)
+cutOffP <- quantile(as.vector(corP), probs=0.9)
+print(paste("90th negative quantile: ", cutOffN))
+print(paste("90th positive quantile: ", cutOffP))
+
+hotnetColors <- c()
 
 #Setup backend to use many processors
 totalCores = detectCores()
@@ -514,9 +540,30 @@ for (module in modules){
     inModule <- moduleColors2 == module
     sum(inModule)
     TOMmodule <- TOM[inModule, inModule]
+    #Pmodule <- corPVal[["p"]][inModule, inModule]
     idsModule <- ids[inModule]
-    log2ModuleProteins <- log2.SNV.WT[inModule]
-    PModuleProteins <- P.SNV.WT[inModule]
+    log2Module <- log2vals[inModule]
+    PModule <- pvals[inModule]
+    
+    geneNames <- mapIds(org.Hs.eg.db, keys = idsModule, column = "ENTREZID", keytype = "SYMBOL")
+    goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
+    if (!(is.null(goBP)) && nrow(goBP) > 0){
+      print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust < 0.1,])))
+      png(file=paste0('figures/coexpression/GO_', module, '.png'), width=1920, height=1020)
+      print(dotplot(goBP, showCategory=10))
+      dev.off()
+    }
+    
+    par(mfrow = c(1,1));
+    column <- match(module, modNames);
+    png(file=paste0('figures/coexpression/', module, '_membershipVSsignficance.png'), width=1920, height=1020)
+    verboseScatterplot(abs(geneModuleMembership[inModule, column]),
+                       abs(GS1[inModule, 1]),
+                       xlab = paste("Module Membership in", module, "module"),
+                       ylab = "Gene significance",
+                       main = paste("Module membership vs. gene significance\n"),
+                       cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+    dev.off()
     
     for (i in 1:length(idsModule)){
       # If there is no gene name associated with the Uniprot ID, keep the uniprot ID
@@ -524,7 +571,7 @@ for (module in modules){
         idsModule[i] <- idsModule[i]
       }
     }
-    node.frame <- data.frame(Symbol=idsModule, LogFC=log2ModuleProteins, Pvalue=PModuleProteins)
+    node.frame <- data.frame(Symbol=idsModule, LogFC=log2Module, Pvalue=PModule)
     rownames(node.frame) <- 1:nrow(node.frame)
     #node.frame$InvPvalue <- 1 - PModuleProteins
     #write.table(node.frame, file=paste0('output/hotnet/nodes_', module, '.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
@@ -559,32 +606,28 @@ for (module in modules){
       result2 <- data.frame(matrix(nrow=0,ncol=2))
       result3 <- data.frame(matrix(nrow=0,ncol=2))
       for (j in (i+1):nrow(TOMmodule)){
-      #foreach(j = (i+1):nrow(TOMmodule), .combine = 'combine', .inorder = FALSE) %dopar% {
-        if (TOMmodule[i,j] > cutOff){
-        #   # Add edge to list
-        # edges.matrix.1[nrow(edges.matrix.1)+1,] <- c(idsModule[i],idsModule[j])
-        # edges.matrix.1.num[nrow(edges.matrix.1.num)+1,] <- c(i,j)
+        #foreach(j = (i+1):nrow(TOMmodule), .combine = 'combine', .inorder = FALSE) %dopar% {
+        #if (Pmodule[i,j] < 0.1 && (corPVal[["cor"]][i,j] > cutOffP || corPVal[["cor"]][i,j] < cutOffN)){
+        if (TOMmodule[i,j] < cutOff && PModule[i] < 0.1 && PModule[j] < 0.1){
+          #   # Add edge to list
+          # edges.matrix.1[nrow(edges.matrix.1)+1,] <- c(idsModule[i],idsModule[j])
+          # edges.matrix.1.num[nrow(edges.matrix.1.num)+1,] <- c(i,j)
           result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
           result2[nrow(result2)+1,] <- c(i,j)
-        #   # Add node to node list
+          #   # Add node to node list
           if (!i %in% result3[,1]){
-          #     #i2g.1[nrow(i2g.1)+1,] <- c(i, idsModule[i])
+            #     #i2g.1[nrow(i2g.1)+1,] <- c(i, idsModule[i])
             result3[nrow(result3)+1,] <- c(i, idsModule[i])
           } 
           if (!j %in% result3[,1]){
-          #     #i2g.1[nrow(i2g.1)+1,] <- c(j, idsModule[j])
+            #     #i2g.1[nrow(i2g.1)+1,] <- c(j, idsModule[j])
             result3[nrow(result3)+1,] <- c(j, idsModule[j])
           }
-        #return(list(data.frame(matrix(c(idsModule[i], idsModule[j]), ncol=2)), data.frame(matrix(c(i, j), ncol=2)), data.frame(rbind(c(i, idsModule[i]), c(j, idsModule[j])), ncol=2)))
+          #return(list(data.frame(matrix(c(idsModule[i], idsModule[j]), ncol=2)), data.frame(matrix(c(i, j), ncol=2)), data.frame(rbind(c(i, idsModule[i]), c(j, idsModule[j])), ncol=2)))
         }
       }
       return(list(result1, result2, result3))
     }
-    # if(!is.null(result)){
-    #   rbind(edges.matrix.1, result[,1])
-    #   rbind(edges.matrix.1.num, result[,2])
-    #   rbind(i2g.1, result[,3])
-    print(result[[3]])
     time2 <- Sys.time()
     print("Slicing input:")
     print(difftime(time2, time1, units="secs"))
@@ -598,141 +641,9 @@ for (module in modules){
     time2 <- Sys.time()
     print("Writing data:")
     print(difftime(time2, time1, units="secs"))
-  }
-}
-stopCluster(cluster)
-# Get table with interactions for each module
-for (module in modules){
-  if (module == "grey"){
-    next
-  } 
-  else {
-    print(module)
-    par(mar = c(1, 1, 1, 1))
-    png(file=paste0('figures/coexpression/', module, '_matrix.png'), width=1920, height=1020)
-    plotMat(t(scale(t(d.adj[colorDynamicTOM==module,]))),rlabels=T,
-            clabels=T,rcols=module,
-            title=module, cex.lab = 2, cex.axis = 2, cex.main = 2)
-    dev.off()
-    
-    ME=datME[, paste("ME",module, sep="")]
-    par(mar = c(2, 1, 1, 1))
-    png(file=paste0('figures/coexpression/', module, '_ME.png'), width=1920, height=1020)
-    barplot(ME, col=module, main="", cex.main=2,
-            ylab="eigengene expression",xlab="array sample", cex.lab = 2, cex.axis = 2, cex.main = 2)
-    dev.off()
-    # Select proteins in module
-    inModule <- moduleColors2 == module
-    sum(inModule)
-    TOMmodule <- TOM[inModule, inModule]
-    idsModule <- ids[inModule]
-    log2ModuleProteins <- log2.SNV.WT[inModule]
-    PModuleProteins <- P.SNV.WT[inModule]
-    
-    for (i in 1:length(idsModule)){
-      # If there is no gene name associated with the Uniprot ID, keep the uniprot ID
-      if (is.na(idsModule[i])){
-        idsModule[i] <- idsModule[i]
-      }
+    if (file.exists(file=paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv'))){
+      hotnetColors <- append(hotnetColors, module)
     }
-    node.frame <- data.frame(Symbol=idsModule, LogFC=log2ModuleProteins, Pvalue=PModuleProteins)
-    rownames(node.frame) <- 1:nrow(node.frame)
-    #node.frame$InvPvalue <- 1 - PModuleProteins
-    #write.table(node.frame, file=paste0('output/hotnet/nodes_', module, '.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
-    # write.table(node.frame[, c('Symbol', 'InvPvalue')], file=paste0('output/hotnet/HotNet_input/g2s_Pval_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote     =FALSE)
-    names(idsModule) <- idsModule
-    
-    write.table(node.frame[, c('Symbol', 'LogFC')], file=paste0('output/hotnet/HotNet_input/g2s_log2_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-    #nodeColorsModule <- node.colors[inModule]
-    
-    # Create empty dataframes
-    time1 <- Sys.time()
-    edges.matrix.1 <- data.frame(matrix(nrow=0, ncol=2))
-    #  edges.matrix.2 <- data.frame(matrix(nrow=0, ncol=2))
-    edges.matrix.1.num <- data.frame(matrix(nrow=0, ncol=2))
-    edges.matrix.2.num <- data.frame(matrix(nrow=0, ncol=2))
-    i2g.1 <- data.frame(matrix(nrow=0, ncol=2))
-    i2g.2 <- data.frame(matrix(nrow=0, ncol=2))
-    writeLines(c(""), "log.txt")
-    # Write tables: one with edges between all nodes, one with a treshold of 0.05 and one with custom thresholds
-    #result = foreach(i = 1:(nrow(TOMmodule)-1), j = (i+1):nrow(TOMmodule)) %dopar% {
-    combine <- function(x,y){
-      names(x[[3]]) <- names(y[[3]])
-      x1 <- rbind(x[[1]], y[[1]])
-      y1 <- rbind(x[[2]], y[[2]])
-      z1 <- rbind(x[[3]], y[[3]])
-      z1 <- z1[!duplicated(z1), ]
-      return(list(x1,y1,z1))
-    }
-    
-    result <- foreach(i = 1:(nrow(TOMmodule)-1), .combine = 'combine', .inorder = FALSE) %:%
-      # result = foreach(j = (i+1):nrow(TOMmodule), .combine = 'rbind') %dopar% {
-      # result1 <- data.frame(matrix(nrow=0,ncol=2))
-      # result2 <- data.frame(matrix(nrow=0,ncol=2))
-      # result3 <- data.frame(matrix(nrow=0,ncol=2))
-      #for (j in (i+1):nrow(TOMmodule)){
-      foreach(j = (i+1):nrow(TOMmodule), .combine = 'combine', .inorder = FALSE) %dopar% {
-        # if (TOMmodule[i,j] > cutOff){
-        #   # Add edge to list
-        #   # edges.matrix.1[nrow(edges.matrix.1)+1,] <- c(idsModule[i],idsModule[j])
-        #   # edges.matrix.1.num[nrow(edges.matrix.1.num)+1,] <- c(i,j)
-        #   result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
-        #   #rbind(result1, c(idsModule[i], idsModule[j]))
-        #   result2[nrow(result2)+1,] <- c(i,j)
-        #   #rbind(result2, c(i,j))
-        #   # Add node to node list
-        #   if (!i %in% result3[,1]){
-        #     #i2g.1[nrow(i2g.1)+1,] <- c(i, idsModule[i])
-        #     #rbind(result3, c(i, idsModule[i]))
-        #     result3[nrow(result3)+1,] <- c(i, idsModule[i])
-        #     #c(c(idsModule[i],idsModule[j]), c(i, j), c(i, idsModule[i]))
-        #   } 
-        #   if (!j %in% result3[,1]){
-        #     #i2g.1[nrow(i2g.1)+1,] <- c(j, idsModule[j])
-        #     #rbind(result3, c(j, idsModule[j]))
-        #     result3[nrow(result3)+1,] <- c(j, idsModule[j])
-        #     #c(c(idsModule[i],idsModule[j]), c(i, j), c(j, idsModule[j]))
-        #   }
-        # result = foreach(j = (i+1):nrow(TOMmodule), .combine = 'rbind') %dopar% {
-        # result1 <- data.frame(matrix(nrow=0,ncol=2))
-        # result2 <- data.frame(matrix(nrow=0,ncol=2))
-        #result3 <- data.frame(matrix(nrow=0,ncol=2))
-        # result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
-        # result2[nrow(result2)+1,] <- c(i,j)
-        # result3[nrow(result3)+1,] <- c(i, idsModule[i])
-        # result3[nrow(result3)+1,] <- c(j, idsModule[j])
-        return(list(data.frame(matrix(c(idsModule[i], idsModule[j]), ncol=2)), data.frame(matrix(c(i, j), ncol=2)), data.frame(rbind(c(i, idsModule[i]), c(j, idsModule[j])), ncol=2)))      }
-        #      if (TOMmodule[i,j] > 0.01){
-        #        # Add edge to list
-        #        edges.matrix.2[nrow(edges.matrix.2)+1,] <- c(idsModule[i],idsModule[j])
-        #        edges.matrix.2.num[nrow(edges.matrix.2.num)+1,] <- c(i,j)
-        #        # Add node to node list
-        #        if (!i %in% i2g.2[,1]){
-        #          i2g.2[nrow(i2g.2)+1,] <- c(i, idsModule[i])
-        #        }
-        #        if (!j %in% i2g.2[,1]){
-        #          i2g.2[nrow(i2g.2)+1,] <- c(j, idsModule[j])
-        #        }
-        #      }
-      #return(list(result1, result2, result3))
-      # if(!is.null(result)){
-      #   rbind(edges.matrix.1, result[,1])
-      #   rbind(edges.matrix.1.num, result[,2])
-      #   rbind(i2g.1, result[,3])
-    print(result[[3]])
-    time2 <- Sys.time()
-    print("Slicing input:")
-    print(difftime(time2, time1, units="secs"))
-    time1 <- Sys.time()
-    write.table(result[[1]], file=paste0('output/hotnet/HotNet_input/name_edges_expression_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-    #  write.table(edges.matrix.2, file=paste0('output/hotnet/HotNet_input/name_edges_expression_001_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-    write.table(result[[2]], file=paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-    #  write.table(edges.matrix.2.num, file=paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-    write.table(result[[3]], file=paste0('output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-    #  write.table(i2g.2, file=paste0('output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-    time2 <- Sys.time()
-    print("Writing data:")
-    print(difftime(time2, time1, units="secs"))
   }
 }
 stopCluster(cluster)
@@ -747,48 +658,51 @@ stopCluster(cluster)
 #}
 #
 #print(modulesHotNet)
+
+
 ######### Run hierarchical hotnet to obtain the most significant submodule within each of the identified modules
 ######### Note that the HotNet package was written in Python and needs to be intstalled separately on your machine
 time1 <- Sys.time()
-system(paste('bash src/run_hierarchicalHotnet_modules.sh "', paste(modules, collapse=' '), '" ', cutOff))
+system(paste('bash', paste(argv[2],'/src/run_hierarchicalHotnet_modules.sh "', sep=""), paste(hotnetColors, collapse=' '), '" ', cutOff))
+system('module load R')
 time2 <- Sys.time()
 print("Hierarchical HotNet:")
 difftime(time2, time1, units="secs")
 
 time1 <- Sys.time()
 dir.create('figures/GO')
+dir.create('output/GO')
 
 #GO
-for (module in modules){
-  if (module == "grey"){
-   next
-  }
-  else{
+for (module in hotnetColors){
+  if (file.exists(file=paste0('output/hotnet/HotNet_results/clusters_hierarchies_log2_', module, '.tsv'))){
     p <- read.table(file=paste0('output/hotnet/HotNet_results/clusters_hierarchies_log2_', module, '.tsv'), sep='\t', header= FALSE, comment.char="")[6, "V1"]
     p <- as.numeric(sub(".*: ", "", p))
-    if (p > 0.1){
-      next
-    }
-    else{
+    if (p <= 0.1){
       #Read in genes
       if (file.exists(paste('output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv', sep=''))){
         if (file.info(paste('output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv', sep=''))$size == 0){
           next
         }
         else {
+          print(module)
           inSubnetwork <- as.vector(t(read.csv(paste('output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv', sep=''), sep='\t', header = FALSE)[1,]))
-          print(inSubnetwork)
+          print(paste("In subnetwork: ", inSubnetwork))
           log2Subnetwork <- log2vals[inSubnetwork]
+          print(paste("Log-fold changes: ", log2Subnetwork))
           PSubnetwork <- pvals[inSubnetwork]
+          print(paste("P-values: ", PSubnetwork))
           geneNames <- mapIds(org.Hs.eg.db, keys = inSubnetwork, column = "ENTREZID", keytype = "SYMBOL")
+          print(paste("Number of genes: ", length(geneNames)))
           if (is.null(geneNames)){
             next
           }
           else {
-            print(module)
-            goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db, minGSSize = 3)
-            goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db, minGSSize = 3)
-            if (any(goBP@result[["p.adjust"]]) <= 0.1){
+            goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
+            goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
+            if (!(is.null(goBP)) && nrow(goBP) > 0){
+              print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust < 0.1,])))
+              write.table(goBP@result, file=paste0('output/GO/', module, 'BP.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
               png(file=paste0('figures/GO/GOBPBar_', module, '.png'), width=1920, height=1020)
               print(barplot(goBP, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
               dev.off()
@@ -803,7 +717,9 @@ for (module in modules){
               print(pmcplot(terms, 2010:2022))
               dev.off()
             }
-            if (any(goMF@result[["p.adjust"]]) <= 0.1){
+            if (!(is.null(goMF)) && nrow(goMF) > 0){
+              print(paste("Number of enriched molecular functions: ", nrow(goMF[goMF$p.adjust < 0.1,])))
+              write.table(goBP@result, file=paste0('output/GO/', module, 'MF.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
               png(file=paste0('figures/GO/GOMFBar_', module, '.png'), width=1920, height=1020)
               print(barplot(goMF, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
               dev.off()
@@ -836,18 +752,7 @@ difftime(endTime, startTime, units="secs")
 #######################################
 #load(file='rdata/normalized_data.RData')
 #load(file='rdata/differential_expression.RData')
-#load(file='rdata/coexpression.RData')
-# dir.create('output/validation')
-# dir.create('figures/validation')
-# dir.create('rdata/validation')
-# 
-# # Load RIMOD data
-# d.val1 <- read.table('data/frontal_TAU_con.tsv', sep='\t', header=TRUE, quote="")
-# d.val1.val <- apply(d.val1[,4:ncol(d.val1)], c(1,2), as.numeric)
-# d.val2 <- read.table('data/temporal_TAU_con.tsv', sep='\t', header=TRUE, quote="")
-# d.val2.val <- apply(d.val2[,4:ncol(d.val2)], c(1,2), as.numeric)
-# meta.val <- read.table('data/metadata_validation.txt', sep='\t', header=TRUE, quote="")
-# rownames(meta.val) <- meta.val$Gel.Code
+#lo+ rownames(meta.val) <- meta.val$Gel.Code
 # 
 # ids1 <- d.val1$UniProt_accession
 # ids1 <- as.character(unlist(lapply(ids1, function(x){strsplit(as.character(x), ';')[[1]][1]})))
