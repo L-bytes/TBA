@@ -39,6 +39,7 @@ source('src/validation.R')
 ### Set working directory
 setwd('C:/Users/marle/Desktop/Y2/Internship/Project') #Replace with your working directory
 
+
 ### Create output directories
 dir.create('output')
 dir.create('figures')
@@ -53,7 +54,7 @@ print("Loading data:")
 difftime(time2, time1, units="secs")
 
 time1 <- Sys.time()
-#d <- d[1:5000,]
+d <- d[,1:ceiling(ncol(d)/2)]
 d <- d[,colnames(d) %in% rownames(group.data)]
 group.data <- group.data[rownames(group.data) %in% colnames(d),]
 new_order <- sort(colnames(d))
@@ -134,9 +135,9 @@ sampleTree <- hclust(dist(t(d.adj)), method = "ave")
 #sampleTree <- hclust(dist(t(d.norm)), method = "ave")
 plot(sampleTree, main = "Sample clustering to detect outliers", sub="", xlab="", cex.lab = 1.5, cex.axis = 1.5, cex.main = 2)
 # Plot a line to show the cut
-abline(h = 250, col = "red");
+abline(h = 275, col = "red");
 # Determine cluster under the line
-clust <- cutreeStatic(sampleTree, cutHeight = 250, minSize = 10)
+clust <- cutreeStatic(sampleTree, cutHeight = 275, minSize = 10)
 #clust <- cutreeStatic(sampleTree, cutHeight = 2250000, minSize = 10)
 table(clust)
 # clust 1 contains the samples we want to keep.
@@ -593,55 +594,50 @@ for (module in modules){
     #result = foreach(i = 1:(nrow(TOMmodule)-1), j = (i+1):nrow(TOMmodule)) %dopar% {
     combine <- function(x,y){
       #names(x[[3]]) <- names(y[[3]])
-      x1 <- rbind(x[[1]], y[[1]])
-      y1 <- rbind(x[[2]], y[[2]])
-      z1 <- rbind(x[[3]], y[[3]])
+      w1 <- rbind(x[[1]], y[[1]])
+      x1 <- rbind(x[[2]], y[[2]])
+      y1 <- rbind(x[[3]], y[[3]])
+      z1 <- rbind(x[[4]], y[[4]])
+      y1 <- y1[!duplicated(y1), ]
       z1 <- z1[!duplicated(z1), ]
-      return(list(x1,y1,z1))
+      return(list(w1,x1,y1,z1))
     }
     
     result <- foreach(i = 1:(nrow(TOMmodule)-1), .combine = 'combine', .inorder = TRUE) %dopar% {
-      # result = foreach(j = (i+1):nrow(TOMmodule), .combine = 'rbind') %dopar% {
       result1 <- data.frame(matrix(nrow=0,ncol=2))
       result2 <- data.frame(matrix(nrow=0,ncol=2))
       result3 <- data.frame(matrix(nrow=0,ncol=2))
+      result4 <- data.frame(matrix(nrow=0,ncol=2))
       for (j in (i+1):nrow(TOMmodule)){
-        #foreach(j = (i+1):nrow(TOMmodule), .combine = 'combine', .inorder = FALSE) %dopar% {
-        #if (Pmodule[i,j] < 0.1 && (corPVal[["cor"]][i,j] > cutOffP || corPVal[["cor"]][i,j] < cutOffN)){
-        if (TOMmodule[i,j] < cutOff && PModule[i] < 0.1 && PModule[j] < 0.1){
+        if (TOMmodule[i,j] >= cutOff){
           #   # Add edge to list
-          # edges.matrix.1[nrow(edges.matrix.1)+1,] <- c(idsModule[i],idsModule[j])
-          # edges.matrix.1.num[nrow(edges.matrix.1.num)+1,] <- c(i,j)
           result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
           result2[nrow(result2)+1,] <- c(i,j)
           #   # Add node to node list
           if (!i %in% result3[,1]){
-            #     #i2g.1[nrow(i2g.1)+1,] <- c(i, idsModule[i])
             result3[nrow(result3)+1,] <- c(i, idsModule[i])
+            result4[nrow(result4)+1,] <- c(idsModule[i], log2Module[i])
           } 
           if (!j %in% result3[,1]){
-            #     #i2g.1[nrow(i2g.1)+1,] <- c(j, idsModule[j])
             result3[nrow(result3)+1,] <- c(j, idsModule[j])
+            result4[nrow(result4)+1,] <- c(idsModule[j], log2Module[j])
           }
-          #return(list(data.frame(matrix(c(idsModule[i], idsModule[j]), ncol=2)), data.frame(matrix(c(i, j), ncol=2)), data.frame(rbind(c(i, idsModule[i]), c(j, idsModule[j])), ncol=2)))
         }
       }
-      return(list(result1, result2, result3))
+      return(list(result1, result2, result3, result4))
     }
     time2 <- Sys.time()
     print("Slicing input:")
     print(difftime(time2, time1, units="secs"))
     time1 <- Sys.time()
     write.table(result[[1]], file=paste0('output/hotnet/HotNet_input/name_edges_expression_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-    #  write.table(edges.matrix.2, file=paste0('output/hotnet/HotNet_input/name_edges_expression_001_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
     write.table(result[[2]], file=paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-    #  write.table(edges.matrix.2.num, file=paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
     write.table(result[[3]], file=paste0('output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-    #  write.table(i2g.2, file=paste0('output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+    write.table(result[[4]], file=paste0('output/hotnet/HotNet_input/g2s_log2_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
     time2 <- Sys.time()
     print("Writing data:")
     print(difftime(time2, time1, units="secs"))
-    if (file.exists(file=paste0('output/hotnet/HotNet_input/edge_list_', module, '.tsv'))){
+    if (file.info(paste('output/hotnet/HotNet_input/i2g_', module, '.tsv', sep=''))$size != 0){
       hotnetColors <- append(hotnetColors, module)
     }
   }
@@ -663,7 +659,7 @@ stopCluster(cluster)
 ######### Run hierarchical hotnet to obtain the most significant submodule within each of the identified modules
 ######### Note that the HotNet package was written in Python and needs to be intstalled separately on your machine
 time1 <- Sys.time()
-system(paste('bash', paste(argv[2],'/src/run_hierarchicalHotnet_modules.sh "', sep=""), paste(hotnetColors, collapse=' '), '" ', cutOff))
+system(paste('bash', paste(argv[1],'/src/run_hierarchicalHotnet_modules.sh "', sep=""), paste(hotnetColors, collapse=' '), '" ', cutOff))
 system('module load R')
 time2 <- Sys.time()
 print("Hierarchical HotNet:")
@@ -706,33 +702,33 @@ for (module in hotnetColors){
               png(file=paste0('figures/GO/GOBPBar_', module, '.png'), width=1920, height=1020)
               print(barplot(goBP, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
               dev.off()
-              png(file=paste0('figures/GO/GOBPNetwork_', module, '.png'), width=1920, height=1020)
-              print(goplot(goBP))
-              dev.off()
               png(file=paste0('figures/GO/GOBPDot_', module, '.png'), width=1920, height=1020)
               print(dotplot(goBP, showCategory=10))
               dev.off()
-              terms <- goBP$Description[1:10]
-              png(file=paste0('figures/GO/GOBPPub_', module, '.png'), width=1920, height=1020)
-              print(pmcplot(terms, 2010:2022))
-              dev.off()
+              #              png(file=paste0('figures/GO/GOBPNetwork_', module, '.png'), width=1920, height=1020)
+              #              print(goplot(goBP))
+              #              dev.off()
+              #              terms <- goBP$Description[1:10]
+              #              png(file=paste0('figures/GO/GOBPPub_', module, '.png'), width=1920, height=1020)
+              #              print(pmcplot(terms, 2010:2022))
+              #              dev.off()
             }
             if (!(is.null(goMF)) && nrow(goMF) > 0){
               print(paste("Number of enriched molecular functions: ", nrow(goMF[goMF$p.adjust < 0.1,])))
-              write.table(goBP@result, file=paste0('output/GO/', module, 'MF.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+              write.table(goMF@result, file=paste0('output/GO/', module, 'MF.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
               png(file=paste0('figures/GO/GOMFBar_', module, '.png'), width=1920, height=1020)
               print(barplot(goMF, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
-              dev.off()
-              png(file=paste0('figures/GO/GOMFNetwork_', module, '.png'), width=1920, height=1020)
-              print(goplot(goMF))
               dev.off()
               png(file=paste0('figures/GO/GOMFDot_', module, '.png'), width=1920, height=1020)
               print(dotplot(goMF, showCategory=10))
               dev.off()
-              terms <- goMF$Description[1:10]
-              png(file=paste0('figures/GO/GOMFPub_', module, '.png'), width=1920, height=1020)
-              print(pmcplot(terms, 2010:2022))
-              dev.off()
+              #              png(file=paste0('figures/GO/GOMFNetwork_', module, '.png'), width=1920, height=1020)
+              #              print(goplot(goMF))
+              #              dev.off()
+              #              terms <- goMF$Description[1:10]
+              #              png(file=paste0('figures/GO/GOMFPub_', module, '.png'), width=1920, height=1020)
+              #              print(pmcplot(terms, 2010:2022))
+              #              dev.off()
             }
           }
         }

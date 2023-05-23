@@ -46,8 +46,9 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
     #        break
     #      }
     #    }
-    
-    sf.bool <- sf.values > 0.8
+    threshold <- 0.9
+    print(paste0("Threshold: ", threshold))
+    sf.bool <- sf.values > threshold
     sf.bool <- sf.bool & (sf.values2 < 100)
     power <- soft.tresh $fitIndices[,1][sf.bool][1]
   }
@@ -57,10 +58,12 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
   #  allowWGCNAThreads(nThreads = NULL)
   #  enableWGCNAThreads(nThreads = NULL)
   #  print(WGCNAnThreads())
+  dSplit <- 0
+  print(paste0("deepSplit: ", dSplit))
   coex.net <- blockwiseModules(d, power=power,
                                TOMType="unsigned", minModuleSize=30,
                                reassignThreshold=0, mergeCutHeight=0.25,
-                               numericLabels=TRUE, pamRespectsDendro=FALSE, deepSplit = 2,
+                               numericLabels=TRUE, pamRespectsDendro=FALSE, deepSplit = dSplit,
                                saveTOMs=TRUE, saveTOMFileBase="rdata/coexpression_discovery", verbose=3, maxBlockSize=nrow(d.summary))
   # Merge M18 (lightgreen) into M9 (magenta), since they were highly similar
   # coex.net$colors <- replace(coex.net$colors, coex.net$colors==18, 9)
