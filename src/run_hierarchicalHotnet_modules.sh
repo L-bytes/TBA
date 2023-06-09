@@ -17,9 +17,9 @@
 
 ### Create data, intermediate data and results, and results directories.
 echo "Creating directory topology"
-data=$PWD/output/hotnet/HotNet_input
-intermediate=$PWD/output/hotnet/HotNet_intermediate
-results=$PWD/output/hotnet/HotNet_results
+data=$PWD/output/$3/output/hotnet/HotNet_input
+intermediate=$PWD/output/$3/output/hotnet/HotNet_intermediate
+results=$PWD/output/$3/output/hotnet/HotNet_results
 scripts=$PWD/hierarchical-hotnet/src #Replace with directory where Hierarchical HotNet is installed
 
 mkdir -p $intermediate

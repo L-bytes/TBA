@@ -46,25 +46,27 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
     #        break
     #      }
     #    }
-    threshold <- 0.9
+    threshold <- 0.8
     print(paste0("Threshold: ", threshold))
     sf.bool <- sf.values > threshold
     sf.bool <- sf.bool & (sf.values2 < 100)
     power <- soft.tresh $fitIndices[,1][sf.bool][1]
   }
-  print(power)
+  print(paste0("Power : ", power))
   # Create network from chosen value of beta
   rownames(d) <- paste(rownames(d), length(groups), sep='_')
   #  allowWGCNAThreads(nThreads = NULL)
   #  enableWGCNAThreads(nThreads = NULL)
   #  print(WGCNAnThreads())
-  dSplit <- 0
+  dSplit <- 2
+  mergeCut <- 0.25
   print(paste0("deepSplit: ", dSplit))
+  print(paste0("mergeCutHeight: ", mergeCut))
   coex.net <- blockwiseModules(d, power=power,
                                TOMType="unsigned", minModuleSize=30,
-                               reassignThreshold=0, mergeCutHeight=0.25,
+                               reassignThreshold=0, mergeCutHeight=mergeCut,
                                numericLabels=TRUE, pamRespectsDendro=FALSE, deepSplit = dSplit,
-                               saveTOMs=TRUE, saveTOMFileBase="rdata/coexpression_discovery", verbose=3, maxBlockSize=nrow(d.summary))
+                               saveTOMs=TRUE, saveTOMFileBase=paste0("output/", hit, "/rdata/coexpression_discovery"), verbose=3, maxBlockSize=nrow(d.summary))
   # Merge M18 (lightgreen) into M9 (magenta), since they were highly similar
   # coex.net$colors <- replace(coex.net$colors, coex.net$colors==18, 9)
   # Plot modules and gene hierarchical clustering

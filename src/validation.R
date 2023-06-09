@@ -124,21 +124,21 @@ permutation.test <- function(FC1, FC2, P1, P2, out.folder, fig.folder, m.ids=NUL
       m.P2 <- P2
     }
     
-    for(i in 1:nPerm){
-      # Shuffle labels of discovery set
-      shuffled <- randomize(FC1, P1)
+    d.perm <- foreach(i = 1:nPerm, .combine = 'rbind', .inorder = TRUE) %dopar% {
+      shuffled <- randomize(FC1,P1)
       random.FC <- shuffled[[1]]
       random.P <- shuffled[[2]]
       
-      # Filter for module proteins
       if(!is.null(m.ids)){
         random.FC <- random.FC[m.ids]
         random.P <- random.P[m.ids]
       }
       
       values <- calculate.curve(random.FC, m.FC2, random.P, m.P2, t.values, randomize=FALSE)
-      d.perm[i,] <- values
+      return(values)
     }
+    
+    colnames(d.perm) <- t.values
   }
   # Calculate actual values
   if(!is.null(m.ids)){
