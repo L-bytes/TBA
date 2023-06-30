@@ -12,7 +12,7 @@
 #' @param outfolder Output folder for figures
 #' @return Coexpression network of \code{d} and significance of log2FC value distribution(s) within each of the modules
 
-coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE){
+coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, i, stage, power=FALSE){
   # Pick acceptable value for beta
   # Choose a set of soft-thresholding powers (beta)
   powers <- c(c(1:11), seq(from=12, to=26, by=2))
@@ -66,7 +66,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
                                TOMType="unsigned", minModuleSize=30,
                                reassignThreshold=0, mergeCutHeight=mergeCut,
                                numericLabels=TRUE, pamRespectsDendro=FALSE, deepSplit = dSplit,
-                               saveTOMs=TRUE, saveTOMFileBase=paste0("output/", hit, "/rdata/coexpression_discovery"), verbose=3, maxBlockSize=nrow(d.summary))
+                               saveTOMs=TRUE, saveTOMFileBase=paste0("output/", i, "/", stage, "/rdata/coexpression_discovery"), verbose=3, maxBlockSize=ncol(d))
   # Merge M18 (lightgreen) into M9 (magenta), since they were highly similar
   # coex.net$colors <- replace(coex.net$colors, coex.net$colors==18, 9)
   # Plot modules and gene hierarchical clustering
