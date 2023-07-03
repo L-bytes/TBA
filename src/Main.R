@@ -1566,9 +1566,13 @@ for (n in c("1","2","3")){
 print(paste('END OF RUN', n))
 }
 
-averageSimilarityModules1 <- mean(as.matrix(read.table(paste0('output/1/validation/output/similarity/moduleSimilarity.tsv'), sep='\t')))
-averageSimilarityModules2 <- mean(as.matrix(read.table(paste0('output/2/validation/output/similarity/moduleSimilarity.tsv'), sep='\t')))
-averageSimilarityModules3 <- mean(as.matrix(read.table(paste0('output/3/validation/output/similarity/moduleSimilarity.tsv'), sep='\t')))
+similarityModules1 <- as.matrix(read.table(paste0('output/1/validation/output/similarity/moduleSimilarity.tsv'), sep='\t'))
+similarityModules2 <- as.matrix(read.table(paste0('output/2/validation/output/similarity/moduleSimilarity.tsv'), sep='\t'))
+similarityModules3 <- as.matrix(read.table(paste0('output/3/validation/output/similarity/moduleSimilarity.tsv'), sep='\t'))
+
+averageSimilarityModules1 <- mean(similarityModules1)
+averageSimilarityModules2 <- mean(similarityModules2)
+averageSimilarityModules3 <- mean(similarityModules3)
 
 averageSimilaritySubnetworks1 <- mean(as.matrix(read.table(paste0('output/1/validation/output/similarity/subnetworkSimilarity.tsv'), sep='\t')))
 averageSimilaritySubnetworks2 <- mean(as.matrix(read.table(paste0('output/2/validation/output/similarity/subnetworkSimilarity.tsv'), sep='\t')))
@@ -1581,6 +1585,59 @@ averageSimilaritySSubnetworks3 <- mean(as.matrix(read.table(paste0('output/3/val
 resultSimilarity1 <- read.table(paste0('output/1/validation/output/similarity/similarity.tsv'), sep='\t')
 resultSimilarity2 <- read.table(paste0('output/2/validation/output/similarity/similarity.tsv'), sep='\t')
 resultSimilarity3 <- read.table(paste0('output/3/validation/output/similarity/similarity.tsv'), sep='\t')
+
+end <- data.frame('Modules' = 1 - c(averageSimilarityModules1, averageSimilarityModules2, averageSimilarityModules3),
+           'Subnetworks' = 1 - c(averageSimilaritySubnetworks1, averageSimilaritySubnetworks2, averageSimilaritySubnetworks3),
+           'Significant subnetworks' = 1 - c(averageSimilaritySSubnetworks1, averageSimilaritySSubnetworks2, averageSimilaritySSubnetworks3),
+           'GO genes' = c(resultSimilarity1['genes',1], resultSimilarity2['genes',1], resultSimilarity3['genes',1]),
+           'BP' = c(resultSimilarity1['BP',1], resultSimilarity2['BP',1], resultSimilarity3['BP',1]),
+           'MF' = c(resultSimilarity1['MF',1], resultSimilarity2['MF',1], resultSimilarity3['MF',1]))
+
+rownames(end) <- c('Run 1', 'Run 2', 'Run 3')
+
+boxplot(end, main = 'Average similarity')
+
+modules1 <- data.frame(matrix(nrow = length(colnames(similarityModules1)), ncol = 5))
+rownames(modules1) <- colnames(similarityModules1)
+colnames(modules1) <- c('Name1', 'Name2', 'Similarity', 'Size1', 'Size2')
+modules1[, 'Name1'] <- rownames(modules1)
+modules1[, 'Name2'] <- rownames(similarityModules1)[apply(similarityModules1,2,which.min)]
+modules1[, 'Similarity'] <- 1 - apply(similarityModules1,2,min)
+for (i in 1:nrow(modules1)){
+  modules1[i, 'Size1'] <- length(as.vector(t(read.table(paste0('output/1/training/output/coexpression/', row.names(modules1[i,]), '.tsv'), sep='\t', header = FALSE))))
+  modules1[i, 'Size2'] <- length(as.vector(t(read.table(paste0('output/1/validation/output/coexpression/', modules1[i, 'Name2'], '.tsv'), sep='\t', header = FALSE))))
+}
+
+ggplot(modules1, aes(x=Size1,y=Similarity)) + 
+  geom_point(aes(size=Size2, colour = Name1, shape = Name2))
+
+modules2 <- data.frame(matrix(nrow = length(colnames(similarityModules2)), ncol = 5))
+rownames(modules2) <- colnames(similarityModules2)
+colnames(modules2) <- c('Name1', 'Name2', 'Similarity', 'Size1', 'Size2')
+modules2[, 'Name1'] <- rownames(modules2)
+modules2[, 'Name2'] <- rownames(similarityModules2)[apply(similarityModules2,2,which.min)]
+modules2[, 'Similarity'] <- 1 - apply(similarityModules2,2,min)
+for (i in 1:nrow(modules2)){
+  modules2[i, 'Size1'] <- length(as.vector(t(read.table(paste0('output/2/training/output/coexpression/', row.names(modules2[i,]), '.tsv'), sep='\t', header = FALSE))))
+  modules2[i, 'Size2'] <- length(as.vector(t(read.table(paste0('output/2/validation/output/coexpression/', modules2[i, 'Name2'], '.tsv'), sep='\t', header = FALSE))))
+}
+
+ggplot(modules2, aes(x=Size1,y=Similarity)) + 
+  geom_point(aes(size=Size2, colour = Name1, shape = Name2))
+
+modules3 <- data.frame(matrix(nrow = length(colnames(similarityModules3)), ncol = 5))
+rownames(modules3) <- colnames(similarityModules3)
+colnames(modules3) <- c('Name1', 'Name2', 'Similarity', 'Size1', 'Size2')
+modules3[, 'Name1'] <- rownames(modules3)
+modules3[, 'Name2'] <- rownames(similarityModules3)[apply(similarityModules3,2,which.min)]
+modules3[, 'Similarity'] <- 1 - apply(similarityModules3,2,min)
+for (i in 1:nrow(modules3)){
+  modules3[i, 'Size1'] <- length(as.vector(t(read.table(paste0('output/3/training/output/coexpression/', row.names(modules3[i,]), '.tsv'), sep='\t', header = FALSE))))
+  modules3[i, 'Size2'] <- length(as.vector(t(read.table(paste0('output/3/validation/output/coexpression/', modules3[i, 'Name2'], '.tsv'), sep='\t', header = FALSE))))
+}
+
+ggplot(modules3, aes(x=Size1,y=Similarity)) + 
+  geom_point(aes(size=Size2, colour = Name1, shape = Name2))
 
 print(paste('Dissimilarity for modules across runs:', mean(c(averageSimilarityModules1, averageSimilarityModules2, averageSimilarityModules3))))
 print(paste('Dissimilarity for subnetworks across runs:', mean(c(averageSimilaritySubnetworks1, averageSimilaritySubnetworks2, averageSimilaritySubnetworks3))))

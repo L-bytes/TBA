@@ -73,7 +73,7 @@ similarity.analysis <- function(folder1, folder2, outfolder){
   write.table(subnetworks, file=paste0(outfolder, '/subnetworkSimilarity.tsv'), row.names=TRUE, col.names=TRUE, sep='\t')
   
   
-  sSubnetworks <- matrix(0, ncol = length(exclusiveA), nrow = length(exclusiveB))
+  sSubnetworks <- matrix(1, ncol = length(exclusiveA), nrow = length(exclusiveB))
   colnames(sSubnetworks) <- exclusiveA
   rownames(sSubnetworks) <- exclusiveB
   
