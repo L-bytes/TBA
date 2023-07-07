@@ -65,7 +65,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, i, stage, p
   coex.net <- blockwiseModules(d, power=power,
                                TOMType="unsigned", minModuleSize=30,
                                reassignThreshold=0, mergeCutHeight=mergeCut,
-                               numericLabels=TRUE, pamRespectsDendro=FALSE, deepSplit = dSplit,
+                               numericLabels=TRUE, pamRespectsDendro=FALSE, deepSplit = dSplit, nPreclusteringCenters = 5,
                                saveTOMs=TRUE, saveTOMFileBase=paste0("output/", i, "/", stage, "/rdata/coexpression_discovery"), verbose=3, maxBlockSize=ncol(d))
   # Merge M18 (lightgreen) into M9 (magenta), since they were highly similar
   # coex.net$colors <- replace(coex.net$colors, coex.net$colors==18, 9)
