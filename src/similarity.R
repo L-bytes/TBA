@@ -10,20 +10,24 @@ similarity.analysis <- function(folder1, folder2, outfolder){
   dir2 <- paste0(folder2, '/GO/')
   gsea <- matrix(0, ncol = 1, nrow = 2)
   rownames(gsea) <- c('BP', 'MF')
-  if (file.info(paste0(dir1, '/gsea_BP.tsv'))$size != 0 && file.info(paste0(dir2, '/gsea_BP.tsv'))$size != 0){
-    SetA <- as.vector(t(read.table(paste0(dir1, 'gsea_BP.tsv'), sep='\t', header = FALSE)))
-    SetB <- as.vector(t(read.table(paste0(dir2, 'gsea_BP.tsv'), sep='\t', header = FALSE)))
-    Jaccard_Similarity <- jaccard_similarity(SetA,SetB)
-    gsea['BP',1] <- Jaccard_Similarity
-    print(paste('Similarity for GSEA BP', ':', Jaccard_Similarity))
+  if (file.exists(paste0(dir1, '/GSEA_BP.tsv')) && file.exists(paste0(dir2, '/GSEA_BP.tsv'))){
+    if (file.info(paste0(dir1, '/GSEA_BP.tsv'))$size != 0 && file.info(paste0(dir2, '/GSEA_BP.tsv'))$size != 0){
+      SetA <- as.vector(t(read.table(paste0(dir1, 'GSEA_BP.tsv'), sep='\t', header = FALSE)))
+      SetB <- as.vector(t(read.table(paste0(dir2, 'GSEA_BP.tsv'), sep='\t', header = FALSE)))
+      Jaccard_Similarity <- jaccard_similarity(SetA,SetB)
+      gsea['BP',1] <- Jaccard_Similarity
+      print(paste('Similarity for GSEA BP', ':', Jaccard_Similarity))
+    }
   }
   
-  if (file.info(paste0(dir1, '/gsea_MF.tsv'))$size != 0 && file.info(paste0(dir2, '/gsea_MF.tsv'))$size != 0){
-    SetA <- as.vector(t(read.table(paste0(dir1, 'gsea_MF.tsv'), sep='\t', header = FALSE)))
-    SetB <- as.vector(t(read.table(paste0(dir2, 'gsea_MF.tsv'), sep='\t', header = FALSE)))
-    Jaccard_Similarity <- jaccard_similarity(SetA,SetB)
-    gsea['MF', 1] <- Jaccard_Similarity
-    print(paste('Similarity for GSEA MF', ':', Jaccard_Similarity))
+  if (file.exists(paste0(dir1, '/GSEA_MF.tsv')) && file.exists(paste0(dir2, '/GSEA_MF.tsv'))){
+    if (file.info(paste0(dir1, '/GSEA_MF.tsv'))$size != 0 && file.info(paste0(dir2, '/GSEA_MF.tsv'))$size != 0){
+      SetA <- as.vector(t(read.table(paste0(dir1, 'GSEA_MF.tsv'), sep='\t', header = FALSE)))
+      SetB <- as.vector(t(read.table(paste0(dir2, 'GSEA_MF.tsv'), sep='\t', header = FALSE)))
+      Jaccard_Similarity <- jaccard_similarity(SetA,SetB)
+      gsea['MF', 1] <- Jaccard_Similarity
+      print(paste('Similarity for GSEA MF', ':', Jaccard_Similarity))
+    }
   }
   
   write.table(gsea, file=paste0(outfolder, '/gsea.tsv'), row.names=TRUE, col.names=TRUE, sep='\t')

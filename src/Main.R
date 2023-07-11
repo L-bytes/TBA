@@ -87,7 +87,7 @@ for (n in c("1","2","3")){
   print(paste("Loading data:", difftime(time2, time1, units="secs")))
   
   time1 <- Sys.time()
-  d <- d[1:500,1:100]
+  d <- d[1:5000,1:200]
   d <- d[,colnames(d) %in% rownames(group.data)]
   group.data <- group.data[rownames(group.data) %in% colnames(d),]
   groups <- group.data[,hit]
@@ -95,7 +95,7 @@ for (n in c("1","2","3")){
   d <- d[, new_order]
   new_order_rows <- sort(rownames(d))
   d <- d[new_order_rows,]
-  d.raw <- apply(d.raw, c(1,2), as.numeric)
+  d.raw <- apply(d, c(1,2), as.numeric)
   d.raw <- d.raw[rowSums(d.raw) >= 10,]
   samples <- colnames(d.raw)
   
@@ -207,7 +207,7 @@ for (n in c("1","2","3")){
   
   ###PLOTS
   png(file=paste0('output/', n, '/training/figures/heatmap.png'), width=1920, height=1020)
-  pheatmap(d.training, cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, show_colnames = FALSE, annotation_col=as.data.frame(group), cex.lab = 2, cex.axis = 2, cex.main = 2)
+  pheatmap(d.training, color=my_palette, cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, show_colnames = FALSE, annotation_col=as.data.frame(group), cex.lab = 2, cex.axis = 2, cex.main = 2)
   dev.off()
   
   colnames(d.training) <- groups
@@ -225,7 +225,19 @@ for (n in c("1","2","3")){
   pheatmap(sampleDistMatrix,
            clustering_distance_rows=sampleDists,
            clustering_distance_cols=sampleDists,
-           col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
+           col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
+  dev.off()
+  
+  geneDists <- dist(d.training)
+  geneDistMatrix <- as.matrix(geneDists)
+  rownames(geneDistMatrix) <- rownames(d.training)
+  colnames(geneDistMatrix) <- rownames(d.training)
+  colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+  png(file=paste0('output/', n, '/training/figures/geneDistances.png'), width=1920, height=1020)
+  pheatmap(geneDistMatrix,
+           clustering_distance_rows=geneDists,
+           clustering_distance_cols=geneDists,
+           col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
   dev.off()
   
   par(mar = c(2, 1, 1, 1))
@@ -341,6 +353,21 @@ for (n in c("1","2","3")){
   time2<- Sys.time()
   print(paste("DESeq2:", difftime(time2, time1, units="secs")))
   
+  d.training.summary <- d.training.summary %>% 
+    mutate(
+      Expression = case_when(log2FC >= log(2) & Pvalue <= 0.1 ~ "Up-regulated",
+      log2FC <= -log(2) & Pvalue <= 0.1 ~ "Down-regulated",
+      TRUE ~ "Unchanged")
+    )
+  png(file=paste0('output/', n, '/training/figures/differential expression/volcano.png'), width=1920, height=1020)
+  print(ggplot(d.training.summary, aes(log2FC, -log(Pvalue,10))) +
+   geom_point(aes(color = Expression), size = 2/5) +
+   xlab(expression("log"[2]*"FC")) + 
+   ylab(expression("-log"[10]*"Pvalue")) +
+   scale_color_manual(values = c("dodgerblue3", "gray50", "firebrick3")) +
+   guides(colour = guide_legend(override.aes = list(size=1.5))))
+  dev.off()
+  
   ###DESEQ PLOTS
   par(mar = c(2, 1, 1, 1))
   png(file=paste0('output/', n, '/training/figures/differential expression/MA.png'), width=1920, height=1020)
@@ -398,37 +425,37 @@ for (n in c("1","2","3")){
   #######################################
   ###############GSEA####################
   #######################################
-  dir.create(paste0('output/', n, '/training/figures/GO'))
-  dir.create(paste0('output/', n, '/training/output/GO'))
-  
-  geneList.training <- d.training.summary[,1]
-  names(geneList.training) <- mapIds(org.Hs.eg.db, keys = row.names(d.training.summary), column = "ENTREZID", keytype = "SYMBOL")
-  geneList.training <- sort(geneList.training, decreasing = TRUE)
-  
-  gsea.training.BP <- gseGO(geneList     = geneList.training,
-                            OrgDb        = org.Hs.eg.db,
-                            ont          = "BP",
-                            pvalueCutoff = 0.1)
-  
-  gsea.training.MF <- gseGO(geneList     = geneList.training,
-                            OrgDb        = org.Hs.eg.db,
-                            ont          = "MF",
-                            pvalueCutoff = 0.1)
-  
-  if (!(is.null(gsea.training.BP)) && nrow(gsea.training.BP) > 0){
-    png(file=paste0('output/', n, '/training/figures/GO/GSEABPDot.png'), width=1920, height=1020)
-    print(dotplot(gsea.training.BP, showCategory=10))
-    dev.off()
-  }
-  
-  if (!(is.null(gsea.training.MF)) && nrow(gsea.training.MF) > 0){
-    png(file=paste0('output/', n, '/training/figures/GO/GSEAMFDot.png'), width=1920, height=1020)
-    print(dotplot(gsea.training.MF, showCategory=10))
-    dev.off()
-  }
-  
-  write.table(rownames(gsea.training.BP@result[gsea.training.BP@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/training/output/GO/GSEA_BP.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  write.table(rownames(gsea.training.MF@result[gsea.training.MF@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/training/output/GO/GSEA_MF.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
+  # dir.create(paste0('output/', n, '/training/figures/GO'))
+  # dir.create(paste0('output/', n, '/training/output/GO'))
+  # 
+  # geneList.training <- d.training.summary[,1]
+  # names(geneList.training) <- mapIds(org.Hs.eg.db, keys = row.names(d.training.summary), column = "ENTREZID", keytype = "SYMBOL")
+  # geneList.training <- sort(geneList.training, decreasing = TRUE)
+  # 
+  # gsea.training.BP <- gseGO(geneList     = geneList.training,
+  #                           OrgDb        = org.Hs.eg.db,
+  #                           ont          = "BP",
+  #                           pvalueCutoff = 0.1)
+  # 
+  # gsea.training.MF <- gseGO(geneList     = geneList.training,
+  #                           OrgDb        = org.Hs.eg.db,
+  #                           ont          = "MF",
+  #                           pvalueCutoff = 0.1)
+  # 
+  # if (!(is.null(gsea.training.BP)) && nrow(gsea.training.BP) > 0){
+  #   png(file=paste0('output/', n, '/training/figures/GO/GSEABPDot.png'), width=1920, height=1020)
+  #   print(dotplot(gsea.training.BP, showCategory=10))
+  #   dev.off()
+  # }
+  # 
+  # if (!(is.null(gsea.training.MF)) && nrow(gsea.training.MF) > 0){
+  #   png(file=paste0('output/', n, '/training/figures/GO/GSEAMFDot.png'), width=1920, height=1020)
+  #   print(dotplot(gsea.training.MF, showCategory=10))
+  #   dev.off()
+  # }
+  # 
+  # write.table(rownames(gsea.training.BP@result[gsea.training.BP@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/training/output/GO/GSEA_BP.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
+  # write.table(rownames(gsea.training.MF@result[gsea.training.MF@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/training/output/GO/GSEA_MF.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
   
   #######################################
   ###   WGCNA coexpression analysis   ###
@@ -471,7 +498,7 @@ for (n in c("1","2","3")){
   
   par(mar = c(1, 1, 1, 1))
   png(file=paste0('output/', n, '/training/figures/coexpression/TOMheatmap.png'), width=1920, height=1020)
-  TOMplot(diss2^4, hier2, main = "TOM heatmap plot, module genes", terrainColors = FALSE, colors = moduleColors2, cex.lab = 2, cex.axis = 2, cex.main = 2)
+  TOMplot(diss2^4, hier2, main = "TOM heatmap plot, module genes", terrainColors = FALSE, Colors = moduleColors2, cex.lab = 2, cex.axis = 2, cex.main = 2)
   dev.off()
   
   png(file=paste0('output/', n, '/training/figures/coexpression/networkHeatmap.png'), width=1920, height=1020)
@@ -588,12 +615,14 @@ for (n in c("1","2","3")){
       
       geneNames <- mapIds(org.Hs.eg.db, keys = idsModule, column = "ENTREZID", keytype = "SYMBOL")
       goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
-      if (nrow(goBP) >= 0){
-        print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust < 0.1,])))
-        
-        png(file=paste0('output/', n, '/training/figures/coexpression/GO_', module, '.png'), width=1920, height=1020)
-        print(dotplot(goBP, showCategory=10))
-        dev.off()
+      if (!(is.null(goBP))){
+        if (nrow(goBP) >= 0){
+          print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust < 0.1,])))
+          
+          png(file=paste0('output/', n, '/training/figures/coexpression/GO_', module, '.png'), width=1920, height=1020)
+          print(dotplot(goBP, showCategory=10))
+          dev.off()
+        }
       }
       
       par(mfrow = c(1,1));
@@ -716,33 +745,37 @@ for (n in c("1","2","3")){
         else {
           goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
           goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
-          if (nrow(goBP) >= 0){
-            print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust <= 0.1,])))
-            
-            write.table(goBP@result, file=paste0('output/', n, '/training/output/GO/', module, 'BP.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-            BPterms <- append(BPterms, rownames(goBP@result[goBP@result$p.adjust <= 0.1,]))
-            
-            png(file=paste0('output/', n, '/training/figures/GO/GOBPBar_', module, '.png'), width=1920, height=1020)
-            print(barplot(goBP, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
-            dev.off()
-            
-            png(file=paste0('output/', n, '/training/figures/GO/GOBPDot_', module, '.png'), width=1920, height=1020)
-            print(dotplot(goBP, showCategory=10))
-            dev.off()
+          if (!(is.null(goBP))){
+            if (nrow(goBP) >= 0){
+              print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust <= 0.1,])))
+              
+              write.table(goBP@result, file=paste0('output/', n, '/training/output/GO/', module, 'BP.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+              BPterms <- append(BPterms, rownames(goBP@result[goBP@result$p.adjust <= 0.1,]))
+              
+              png(file=paste0('output/', n, '/training/figures/GO/GOBPBar_', module, '.png'), width=1920, height=1020)
+              print(barplot(goBP, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
+              dev.off()
+              
+              png(file=paste0('output/', n, '/training/figures/GO/GOBPDot_', module, '.png'), width=1920, height=1020)
+              print(dotplot(goBP, showCategory=10))
+              dev.off()
+            }
           }
-          if (nrow(goMF) >= 0){
-            print(paste("Number of enriched molecular functions: ", nrow(goMF[goMF$p.adjust <= 0.1,])))
-            
-            write.table(goMF@result, file=paste0('output/', n, '/training/output/GO/', module, 'MF.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-            MFterms <- append(MFterms, rownames(goMF@result[goMF@result$p.adjust <= 0.1,]))
-            
-            png(file=paste0('output/', n, '/training/figures/GO/GOMFBar_', module, '.png'), width=1920, height=1020)
-            print(barplot(goMF, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
-            dev.off()
-            
-            png(file=paste0('output/', n, '/training/figures/GO/GOMFDot_', module, '.png'), width=1920, height=1020)
-            print(dotplot(goMF, showCategory=10))
-            dev.off()
+          if (!(is.null(goMF))){
+            if (nrow(goMF) >= 0){
+              print(paste("Number of enriched molecular functions: ", nrow(goMF[goMF$p.adjust <= 0.1,])))
+              
+              write.table(goMF@result, file=paste0('output/', n, '/training/output/GO/', module, 'MF.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+              MFterms <- append(MFterms, rownames(goMF@result[goMF@result$p.adjust <= 0.1,]))
+              
+              png(file=paste0('output/', n, '/training/figures/GO/GOMFBar_', module, '.png'), width=1920, height=1020)
+              print(barplot(goMF, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
+              dev.off()
+              
+              png(file=paste0('output/', n, '/training/figures/GO/GOMFDot_', module, '.png'), width=1920, height=1020)
+              print(dotplot(goMF, showCategory=10))
+              dev.off()
+            }
           }
         }
       }  
@@ -1212,12 +1245,14 @@ for (n in c("1","2","3")){
       
       geneNames <- mapIds(org.Hs.eg.db, keys = idsModule, column = "ENTREZID", keytype = "SYMBOL")
       goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
-      if (nrow(goBP) >= 0){
-        print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust < 0.1,])))
-        
-        png(file=paste0('output/', n, '/validation/figures/coexpression/GO_', module, '.png'), width=1920, height=1020)
-        print(dotplot(goBP, showCategory=10))
-        dev.off()
+      if (!(is.null(goBP))){
+        if (nrow(goBP) >= 0){
+          print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust < 0.1,])))
+          
+          png(file=paste0('output/', n, '/validation/figures/coexpression/GO_', module, '.png'), width=1920, height=1020)
+          print(dotplot(goBP, showCategory=10))
+          dev.off()
+        }
       }
       
       par(mfrow = c(1,1));
@@ -1341,31 +1376,35 @@ for (n in c("1","2","3")){
         else {
           goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
           goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
-          if (nrow(goBP) >= 0){
-            print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust <= 0.1,])))
-            write.table(goBP@result, file=paste0('output/', n, '/validation/output/GO/', module, 'BP.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-            BPterms <- append(BPterms, rownames(goBP@result[goBP@result$p.adjust <= 0.1,]))
-            
-            png(file=paste0('output/', n, '/validation/figures/GO/GOBPBar_', module, '.png'), width=1920, height=1020)
-            print(barplot(goBP, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
-            dev.off()
-            
-            png(file=paste0('output/', n, '/validation/figures/GO/GOBPDot_', module, '.png'), width=1920, height=1020)
-            print(dotplot(goBP, showCategory=10))
-            dev.off()
+          if (!(is.null(goBP))){
+            if (nrow(goBP) >= 0){
+              print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust <= 0.1,])))
+              write.table(goBP@result, file=paste0('output/', n, '/validation/output/GO/', module, 'BP.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+              BPterms <- append(BPterms, rownames(goBP@result[goBP@result$p.adjust <= 0.1,]))
+              
+              png(file=paste0('output/', n, '/validation/figures/GO/GOBPBar_', module, '.png'), width=1920, height=1020)
+              print(barplot(goBP, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
+              dev.off()
+              
+              png(file=paste0('output/', n, '/validation/figures/GO/GOBPDot_', module, '.png'), width=1920, height=1020)
+              print(dotplot(goBP, showCategory=10))
+              dev.off()
+            }
           }
-          if (!(is.null(goMF)) && nrow(goMF) > 0){
-            print(paste("Number of enriched molecular functions: ", nrow(goMF[goMF$p.adjust <= 0.1,])))
-            write.table(goMF@result, file=paste0('output/', n, '/validation/output/GO/', module, 'MF.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-            MFterms <- append(MFterms, rownames(goMF@result[goMF@result$p.adjust <= 0.1,]))
-            
-            png(file=paste0('output/', n, '/validation/figures/GO/GOMFBar_', module, '.png'), width=1920, height=1020)
-            print(barplot(goMF, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
-            dev.off()
-            
-            png(file=paste0('output/', n, '/validation/figures/GO/GOMFDot_', module, '.png'), width=1920, height=1020)
-            print(dotplot(goMF, showCategory=10))
-            dev.off()
+          if (!(is.null(goMF))){
+            if (nrow(goMF) >= 0){
+              print(paste("Number of enriched molecular functions: ", nrow(goMF[goMF$p.adjust <= 0.1,])))
+              write.table(goMF@result, file=paste0('output/', n, '/validation/output/GO/', module, 'MF.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+              MFterms <- append(MFterms, rownames(goMF@result[goMF@result$p.adjust <= 0.1,]))
+              
+              png(file=paste0('output/', n, '/validation/figures/GO/GOMFBar_', module, '.png'), width=1920, height=1020)
+              print(barplot(goMF, showCategory=10, cex.lab = 2, cex.axis = 2, cex.main = 2))
+              dev.off()
+              
+              png(file=paste0('output/', n, '/validation/figures/GO/GOMFDot_', module, '.png'), width=1920, height=1020)
+              print(dotplot(goMF, showCategory=10))
+              dev.off()
+            }
           }
         }
       }  

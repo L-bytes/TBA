@@ -63,7 +63,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, i, stage, p
   print(paste0("deepSplit: ", dSplit))
   print(paste0("mergeCutHeight: ", mergeCut))
   coex.net <- blockwiseModules(d, power=power,
-                               TOMType="unsigned", minModuleSize=30,
+                               TOMType="unsigned", #minModuleSize=30,
                                reassignThreshold=0, mergeCutHeight=mergeCut,
                                numericLabels=TRUE, pamRespectsDendro=FALSE, deepSplit = dSplit, nPreclusteringCenters = 5,
                                saveTOMs=TRUE, saveTOMFileBase=paste0("output/", i, "/", stage, "/rdata/coexpression_discovery"), verbose=3, maxBlockSize=ncol(d))
