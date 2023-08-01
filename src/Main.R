@@ -18,10 +18,11 @@ library(foreach)
 library(doParallel)
 library(clusterProfiler)
 library(ggplot2)
-library(pheatmap)
 library(RColorBrewer)
 library(enrichplot)
 library(europepmc)
+library(data.table)
+library(dplyr, exclude = c("collapse", "combine", "count", "desc", "filter", "first", "lag", "rename", "select", "slice"))
 library(WGCNA)
 options(stringsAsFactors=FALSE)
 # Load required functions from the src directory
@@ -81,13 +82,17 @@ for (n in c("1","2","3")){
   
   ### Load data
   time1 <- Sys.time()
-  d <- read.table('./data/TCGA_rna_count_data.txt', header=TRUE, sep='\t', quote="", row.names = 1, check.names=FALSE)
-  group.data <- read.table('./data/non_silent_mutation_profile_crc.txt', header=TRUE, sep='\t', quote="", row.names = 1, check.names=FALSE)
+  d <- data.frame(fread('./data/TCGA_rna_count_data.txt', header=TRUE), check.names = FALSE, row.names = 1)
+  group.data <- data.frame(fread('./data/non_silent_mutation_profile_crc.csv', header=TRUE), row.names=1)
   time2 <- Sys.time()
+  mut <- read.csv('./data/TCGA_mutation_definition_data.csv', check.names=FALSE)
+  G12 <- subset(mut, grepl("G12", HGVSp_Short)  &  Hugo_Symbol == "KRAS")
+  group.data[substr(G12$Tumor_Sample_Barcode,1,16), "KRAS"] <- "SNV"
+  group.data[!(rownames(group.data) %in% substr(G12$Tumor_Sample_Barcode,1,16)), "KRAS"] <- "WT"
   print(paste("Loading data:", difftime(time2, time1, units="secs")))
   
   time1 <- Sys.time()
-  d <- d[1:5000,1:200]
+  # <- d[1:5000,1:1000]
   d <- d[,colnames(d) %in% rownames(group.data)]
   group.data <- group.data[rownames(group.data) %in% colnames(d),]
   groups <- group.data[,hit]
@@ -99,13 +104,32 @@ for (n in c("1","2","3")){
   d.raw <- d.raw[rowSums(d.raw) >= 10,]
   samples <- colnames(d.raw)
   
-  d.adj <- varianceStabilizingTransformation(d.raw, blind = F)
+  group <- as.matrix(group.data[,hit])
+  rownames(group) <- rownames(group.data)
+  colnames(group) <- c(hit)
+  
+  dds <- DESeqDataSetFromMatrix(countData = d.raw, colData = group, design = formula(paste("~",hit)))
+  ddsVST <- varianceStabilizingTransformation(dds, blind = F)
+  
+  d.adj <- assay(ddsVST)
   d.norm <- normalize.sample(d.raw)
   d.cs <- normalize.cs(d.norm)
   
+  # ntd <- normTransform(dds)
+  # d.adj <- assay(ntd)
+
+  pca <- prcomp(t(d.adj))
+  df <- cbind(group.data, pca$x)
+  
+  for (p in p(1:10)){
+    png(file=paste0('KRAS/PCA',p, p+1, 'VST.png'), width=1920, height=1020)
+    ggplot(df) + geom_point(aes(x=paste0('PC',p), y=paste0('PC',p+1),colour = KRAS))
+    dev.off()
+  }
+  
   colnames(d.adj) <- groups
   
-  png(file=paste0('output/', n, '/training/figures/clusterSamplesVST.png'), width=1920, height=1020)
+  png(file=paste0('output/clusterSamplesVST.png'), width=1920, height=1020)
   sampleTree <- hclust(dist(t(d.adj)), method = "ave")
   #png(file=paste0('figures/clusterSamplesNorm.png'), width=1920, height=1020)
   #sampleTree <- hclust(dist(t(d.norm)), method = "ave")
@@ -133,38 +157,33 @@ for (n in c("1","2","3")){
   
   colors = c(seq(-5,-1,length=1000),seq(-.999999,.999999,length=1000),seq(1, 5,length=1000))
   my_palette <- colorRampPalette(c("blue", "white", "red"))(n = 2999)
-  png(file=paste0('output/', n, '/training/figures/heatmapSNV.png'), width=1920, height=1020)
-  pheatmap(d.cs.SNV,
-           legend=TRUE,
-           color=my_palette,
-           breaks=colors,
-           show_rownames=FALSE,
-           show_colnames=FALSE
-  )
+  
+  png(file=paste0('output/heatmap.png'), width=1920, height=1020)
+  pheatmap(d.cs, color=my_palette, cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, show_colnames = FALSE, annotation_col=as.data.frame(group), cex.lab = 2, cex.axis = 2, cex.main = 2)
   dev.off()
   
-  png(file=paste0('output/', n, '/training/figures/heatmapWT.png'), width=1920, height=1020)
-  pheatmap(d.cs.WT,
-           legend=TRUE,
-           color=my_palette,
-           breaks=colors,
-           show_rownames=FALSE,
-           show_colnames=FALSE
-  )
-  dev.off()
+  # png(file=paste0('output/heatmapSNV.png'), width=1920, height=1020)
+  # pheatmap(d.cs.SNV,
+  #          legend=TRUE,
+  #          color=my_palette,
+  #          breaks=colors,
+  #          show_rownames=FALSE,
+  #          show_colnames=FALSE
+  # )
+  # dev.off()
+  # 
+  # png(file=paste0('output/heatmapWT.png'), width=1920, height=1020)
+  # pheatmap(d.cs.WT,
+  #          legend=TRUE,
+  #          color=my_palette,
+  #          breaks=colors,
+  #          show_rownames=FALSE,
+  #          show_colnames=FALSE
+  # )
+  # dev.off()
   
   selection <- sample(colnames(d.raw), floor(ncol(d.raw)/2))
   save(selection, file=paste0('output/' , n, '/training/rdata/sampleSelection.RData'))
-  
-  group <- as.matrix(group.data[,hit])
-  rownames(group) <- rownames(group.data)
-  colnames(group) <- c(hit)
-  
-  dds <- DESeqDataSetFromMatrix(countData = d.raw, colData = group, design = formula(paste("~",hit)))
-  vsd <- varianceStabilizingTransformation(dds, blind=FALSE)
-  png(file=paste0('output/', n, '/PCA.png'), width=1920, height=1020)
-  print(plotPCA(vsd, intgroup=c(hit)))
-  dev.off()
   
   d.training <- d.raw[,selection]
   samples <- colnames(d.training)
@@ -177,12 +196,14 @@ for (n in c("1","2","3")){
   
   d.training.cs.WT <- d.training.cs[,rownames(group.data.training[group.data.training[,hit] == "WT",])]
   d.training.cs.SNV <- d.training.cs[,rownames(group.data.training[group.data.training[,hit] == "SNV",])]
+  
   png(file=paste0('output/', n, '/training/figures/heatmapSNVSubset.png'), width=1920, height=1020)
   pheatmap(d.training.cs.SNV,
            legend=TRUE,
            color=my_palette,
            breaks=colors,
            show_rownames=FALSE,
+           
            show_colnames=FALSE
   )
   dev.off()
@@ -220,7 +241,6 @@ for (n in c("1","2","3")){
   sampleDistMatrix <- as.matrix(sampleDists)
   rownames(sampleDistMatrix) <- colnames(d.training)
   colnames(sampleDistMatrix) <- colnames(d.training)
-  colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
   png(file=paste0('output/', n, '/training/figures/sampleDistances.png'), width=1920, height=1020)
   pheatmap(sampleDistMatrix,
            clustering_distance_rows=sampleDists,
@@ -232,7 +252,6 @@ for (n in c("1","2","3")){
   geneDistMatrix <- as.matrix(geneDists)
   rownames(geneDistMatrix) <- rownames(d.training)
   colnames(geneDistMatrix) <- rownames(d.training)
-  colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
   png(file=paste0('output/', n, '/training/figures/geneDistances.png'), width=1920, height=1020)
   pheatmap(geneDistMatrix,
            clustering_distance_rows=geneDists,
@@ -278,7 +297,7 @@ for (n in c("1","2","3")){
   #dev.off()
   
   png(file=paste0('output/', n, '/training/figures/heatmapVST.png'), width=1920, height=1020)
-  pheatmap(d.training.adj, cluster_rows=TRUE, show_colnames=FALSE, cluster_cols=TRUE, show_rownames = FALSE, annotation_col=as.data.frame(group))
+  pheatmap(d.training.adj, color=my_palette, cluster_rows=TRUE, show_colnames=FALSE, cluster_cols=TRUE, show_rownames = FALSE, annotation_col=as.data.frame(group))
   dev.off()
   
   group[,1] <- as.numeric(factor(group[,1]))
@@ -300,16 +319,26 @@ for (n in c("1","2","3")){
   meanSdPlot(d.training.adj, cex.lab = 2, cex.axis = 2, cex.main = 2)
   dev.off()
   
-  sampleDists <- dist(t(d.training.adj))
-  sampleDistMatrix <- as.matrix(sampleDists)
-  rownames(sampleDistMatrix) <- colnames(d.training.adj)
-  colnames(sampleDistMatrix) <- colnames(d.training.adj)
-  colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+  sampleDists.adj <- dist(t(d.training.adj))
+  sampleDistMatrix.adj <- as.matrix(sampleDists.adj)
+  rownames(sampleDistMatrix.adj) <- colnames(d.training.adj)
+  colnames(sampleDistMatrix.adj) <- colnames(d.training.adj)
   png(file=paste0('output/', n, '/training/figures/sampleDistancesVST.png'), width=1920, height=1020)
-  pheatmap(sampleDistMatrix,
-           clustering_distance_rows=sampleDists,
-           clustering_distance_cols=sampleDists,
-           col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
+  pheatmap(sampleDistMatrix.adj,
+           clustering_distance_rows=sampleDists.adj,
+           clustering_distance_cols=sampleDists.adj,
+           col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
+  dev.off()
+  
+  geneDists.adj <- dist(d.training.adj)
+  geneDistMatrix.adj <- as.matrix(geneDists.adj)
+  rownames(geneDistMatrix.adj) <- rownames(d.training.adj)
+  colnames(geneDistMatrix.adj) <- rownames(d.training.adj)
+  png(file=paste0('output/', n, '/training/figures/geneDistancesVST.png'), width=1920, height=1020)
+  pheatmap(geneDistMatrix.adj,
+           clustering_distance_rows=geneDists.adj,
+           clustering_distance_cols=geneDists.adj,
+           col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
   dev.off()
   
   #######################################
@@ -361,10 +390,10 @@ for (n in c("1","2","3")){
     )
   png(file=paste0('output/', n, '/training/figures/differential expression/volcano.png'), width=1920, height=1020)
   print(ggplot(d.training.summary, aes(log2FC, -log(Pvalue,10))) +
-   geom_point(aes(color = Expression), size = 2/5) +
+   geom_point(aes(color = Expression), size = 2) +
    xlab(expression("log"[2]*"FC")) + 
    ylab(expression("-log"[10]*"Pvalue")) +
-   scale_color_manual(values = c("dodgerblue3", "gray50", "firebrick3")) +
+   scale_color_manual(values = c("Up-regulated" = "red", "Down-regulated" = "blue", "Unchanged" = "grey")) +
    guides(colour = guide_legend(override.aes = list(size=1.5))))
   dev.off()
   
@@ -383,32 +412,32 @@ for (n in c("1","2","3")){
   plotDispEsts(dds, cex.lab = 2, cex.axis = 2, cex.main = 2)
   dev.off()
   
-  par(mar = c(2, 1, 1, 1))
-  png(file=paste0('output/', n, '/training/figures/differential expression/rejections.png'), width=1920, height=1020)
-  plot(metadata(res)$filterNumRej, 
-       type="b", ylab="number of rejections",
-       xlab="quantiles of filter", cex.lab = 2, cex.axis = 2, cex.main = 2)
-  lines(metadata(res)$lo.fit, col="red")
-  abline(v=metadata(res)$filterTheta)
-  dev.off()
-  
-  par(mar = c(1, 1, 1, 1))
-  png(file=paste0('output/', n, '/training/figures/differential expression/outliers.png'), width=1920, height=1020)
-  boxplot(log10(assays(dds)[["cooks"]]), range=0, las=2, names = groups)
-  dev.off()
-  
-  par(mar = c(2, 1, 1, 1))
-  W <- res$stat
-  maxCooks <- apply(assays(dds)[["cooks"]],1,max)
-  idx <- !is.na(W)
-  png(file=paste0('output/', n, '/training/figures/differential expression/Wald.png'), width=1920, height=1020)
-  plot(rank(W[idx]), maxCooks[idx], xlab="rank of Wald statistic", 
-       ylab="maximum Cook's distance per gene",
-       ylim=c(0,5), cex=.4, col=rgb(0,0,0,.3), cex.lab = 2, cex.axis = 2, cex.main = 2)
-  m <- ncol(dds)
-  p <- 3
-  abline(h=qf(.99, p, m - p))
-  dev.off()
+  # par(mar = c(2, 1, 1, 1))
+  # png(file=paste0('output/', n, '/training/figures/differential expression/rejections.png'), width=1920, height=1020)
+  # plot(metadata(res)$filterNumRej, 
+  #      type="b", ylab="number of rejections",
+  #      xlab="quantiles of filter", cex.lab = 2, cex.axis = 2, cex.main = 2)
+  # lines(metadata(res)$lo.fit, col="red")
+  # abline(v=metadata(res)$filterTheta)
+  # dev.off()
+  # 
+  # par(mar = c(1, 1, 1, 1))
+  # png(file=paste0('output/', n, '/training/figures/differential expression/outliers.png'), width=1920, height=1020)
+  # boxplot(log10(assays(dds)[["cooks"]]), range=0, las=2, names = groups)
+  # dev.off()
+  # 
+  # par(mar = c(2, 1, 1, 1))
+  # W <- res$stat
+  # maxCooks <- apply(assays(dds)[["cooks"]],1,max)
+  # idx <- !is.na(W)
+  # png(file=paste0('output/', n, '/training/figures/differential expression/Wald.png'), width=1920, height=1020)
+  # plot(rank(W[idx]), maxCooks[idx], xlab="rank of Wald statistic", 
+  #      ylab="maximum Cook's distance per gene",
+  #      ylim=c(0,5), cex=.4, col=rgb(0,0,0,.3), cex.lab = 2, cex.axis = 2, cex.main = 2)
+  # m <- ncol(dds)
+  # p <- 3
+  # abline(h=qf(.99, p, m - p))
+  # dev.off()
   
   use <- res$baseMean > metadata(res)$filterThreshold
   h1 <- hist(res$pvalue[!use], breaks=0:50/50, plot=FALSE)
@@ -425,37 +454,37 @@ for (n in c("1","2","3")){
   #######################################
   ###############GSEA####################
   #######################################
-  # dir.create(paste0('output/', n, '/training/figures/GO'))
-  # dir.create(paste0('output/', n, '/training/output/GO'))
-  # 
-  # geneList.training <- d.training.summary[,1]
-  # names(geneList.training) <- mapIds(org.Hs.eg.db, keys = row.names(d.training.summary), column = "ENTREZID", keytype = "SYMBOL")
-  # geneList.training <- sort(geneList.training, decreasing = TRUE)
-  # 
-  # gsea.training.BP <- gseGO(geneList     = geneList.training,
-  #                           OrgDb        = org.Hs.eg.db,
-  #                           ont          = "BP",
-  #                           pvalueCutoff = 0.1)
-  # 
-  # gsea.training.MF <- gseGO(geneList     = geneList.training,
-  #                           OrgDb        = org.Hs.eg.db,
-  #                           ont          = "MF",
-  #                           pvalueCutoff = 0.1)
-  # 
-  # if (!(is.null(gsea.training.BP)) && nrow(gsea.training.BP) > 0){
-  #   png(file=paste0('output/', n, '/training/figures/GO/GSEABPDot.png'), width=1920, height=1020)
-  #   print(dotplot(gsea.training.BP, showCategory=10))
-  #   dev.off()
-  # }
-  # 
-  # if (!(is.null(gsea.training.MF)) && nrow(gsea.training.MF) > 0){
-  #   png(file=paste0('output/', n, '/training/figures/GO/GSEAMFDot.png'), width=1920, height=1020)
-  #   print(dotplot(gsea.training.MF, showCategory=10))
-  #   dev.off()
-  # }
-  # 
-  # write.table(rownames(gsea.training.BP@result[gsea.training.BP@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/training/output/GO/GSEA_BP.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  # write.table(rownames(gsea.training.MF@result[gsea.training.MF@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/training/output/GO/GSEA_MF.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
+  dir.create(paste0('output/', n, '/training/figures/GO'))
+  dir.create(paste0('output/', n, '/training/output/GO'))
+  
+  geneList.training <- d.training.summary[,1]
+  names(geneList.training) <- mapIds(org.Hs.eg.db, keys = row.names(d.training.summary), column = "ENTREZID", keytype = "SYMBOL")
+  geneList.training <- sort(geneList.training, decreasing = TRUE)
+  
+  gsea.training.BP <- gseGO(geneList     = geneList.training,
+                            OrgDb        = org.Hs.eg.db,
+                            ont          = "BP",
+                            pvalueCutoff = 0.1)
+  
+  gsea.training.MF <- gseGO(geneList     = geneList.training,
+                            OrgDb        = org.Hs.eg.db,
+                            ont          = "MF",
+                            pvalueCutoff = 0.1)
+  
+  if (!(is.null(gsea.training.BP)) && nrow(gsea.training.BP) > 0){
+    png(file=paste0('output/', n, '/training/figures/GO/GSEABPDot.png'), width=1920, height=1020)
+    print(dotplot(gsea.training.BP, showCategory=10))
+    dev.off()
+  }
+  
+  if (!(is.null(gsea.training.MF)) && nrow(gsea.training.MF) > 0){
+    png(file=paste0('output/', n, '/training/figures/GO/GSEAMFDot.png'), width=1920, height=1020)
+    print(dotplot(gsea.training.MF, showCategory=10))
+    dev.off()
+  }
+  
+  write.table(rownames(gsea.training.BP@result[gsea.training.BP@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/training/output/GO/GSEA_BP.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
+  write.table(rownames(gsea.training.MF@result[gsea.training.MF@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/training/output/GO/GSEA_MF.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
   
   #######################################
   ###   WGCNA coexpression analysis   ###
@@ -498,7 +527,7 @@ for (n in c("1","2","3")){
   
   par(mar = c(1, 1, 1, 1))
   png(file=paste0('output/', n, '/training/figures/coexpression/TOMheatmap.png'), width=1920, height=1020)
-  TOMplot(diss2^4, hier2, main = "TOM heatmap plot, module genes", terrainColors = FALSE, Colors = moduleColors2, cex.lab = 2, cex.axis = 2, cex.main = 2)
+  TOMplot(diss2^4, hier2, main = "TOM heatmap plot, module genes", terrainColors = FALSE, colors = moduleColors2, cex.lab = 2, cex.axis = 2, cex.main = 2)
   dev.off()
   
   png(file=paste0('output/', n, '/training/figures/coexpression/networkHeatmap.png'), width=1920, height=1020)
@@ -616,7 +645,7 @@ for (n in c("1","2","3")){
       geneNames <- mapIds(org.Hs.eg.db, keys = idsModule, column = "ENTREZID", keytype = "SYMBOL")
       goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
       if (!(is.null(goBP))){
-        if (nrow(goBP) >= 0){
+        if (nrow(goBP) > 0){
           print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust < 0.1,])))
           
           png(file=paste0('output/', n, '/training/figures/coexpression/GO_', module, '.png'), width=1920, height=1020)
@@ -672,11 +701,11 @@ for (n in c("1","2","3")){
             #   # Add node to node list
             if (!i %in% result3[,1]){
               result3[nrow(result3)+1,] <- c(i, idsModule[i])
-              result4[nrow(result4)+1,] <- c(idsModule[i], log2Module[i]*(1-PModule[i]))
+              result4[nrow(result4)+1,] <- c(idsModule[i], log2Module[i])
             } 
             if (!j %in% result3[,1]){
               result3[nrow(result3)+1,] <- c(j, idsModule[j])
-              result4[nrow(result4)+1,] <- c(idsModule[j], log2Module[j]*(1-PModule[j]))
+              result4[nrow(result4)+1,] <- c(idsModule[j], log2Module[j])
             }
           }
         }
@@ -746,7 +775,7 @@ for (n in c("1","2","3")){
           goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
           goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
           if (!(is.null(goBP))){
-            if (nrow(goBP) >= 0){
+            if (nrow(goBP) > 0){
               print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust <= 0.1,])))
               
               write.table(goBP@result, file=paste0('output/', n, '/training/output/GO/', module, 'BP.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
@@ -762,7 +791,7 @@ for (n in c("1","2","3")){
             }
           }
           if (!(is.null(goMF))){
-            if (nrow(goMF) >= 0){
+            if (nrow(goMF) > 0){
               print(paste("Number of enriched molecular functions: ", nrow(goMF[goMF$p.adjust <= 0.1,])))
               
               write.table(goMF@result, file=paste0('output/', n, '/training/output/GO/', module, 'MF.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
@@ -841,26 +870,7 @@ for (n in c("1","2","3")){
            show_colnames=FALSE
   )
   dev.off()
-  ##
-  #d.validation.adj.WT <- d.validation.adj[,rownames(group.data.validation[group.data.validation[,hit] == "WT",])]
-  #d.validation.adj.SNV <- d.validation.adj[,rownames(group.data.validation[group.data.validation[,hit] == "SNV",])]
-  
-  #png(file=paste0('output/', n, '/validation/figures/sampleClusterVSTWT.png'), width=1920, height=1020)
-  #plotClusterTreeSamples(t(d.validation.adj.WT), cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #dev.off()
-  #
-  #png(file=paste0('output/', n, '/validation/figures/sampleClusterVSTSNV.png'), width=1920, height=1020)
-  #plotClusterTreeSamples(t(d.validation.adj.SNV), cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #dev.off()
-  #
-  #png(file=paste0('output/', n, '/validation/figures/heatmapVSTWT.png'), width=1920, height=1020)
-  #pheatmap(d.validation.adj.WT, cluster_rows=TRUE, show_colnames=FALSE, cluster_cols=TRUE, show_rownames = FALSE)
-  #dev.off()
-  #
-  #png(file=paste0('output/', n, '/validation/figures/heatmapVSTSNV.png'), width=1920, height=1020)
-  #pheatmap(d.validation.adj.SNV, cluster_rows=TRUE, show_colnames=FALSE, cluster_cols=TRUE, show_rownames = FALSE)
-  #dev.off()
-  
+
   # Save input data
   save(d.validation, group.data.validation, groups, file=(paste0('output/', n, '/validation/rdata/input_data.RData')))
   time2 <- Sys.time()
@@ -872,7 +882,7 @@ for (n in c("1","2","3")){
   
   ###PLOTS
   png(file=paste0('output/', n, '/validation/figures/heatmap.png'), width=1920, height=1020)
-  pheatmap(d.validation, cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, show_colnames = FALSE, annotation_col=as.data.frame(group), cex.lab = 2, cex.axis = 2, cex.main = 2)
+  pheatmap(d.validation, color=my_palette, cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, show_colnames = FALSE, annotation_col=as.data.frame(group), cex.lab = 2, cex.axis = 2, cex.main = 2)
   dev.off()
   
   colnames(d.validation) <- groups
@@ -885,12 +895,22 @@ for (n in c("1","2","3")){
   sampleDistMatrix <- as.matrix(sampleDists)
   rownames(sampleDistMatrix) <- colnames(d.validation)
   colnames(sampleDistMatrix) <- colnames(d.validation)
-  colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
   png(file=paste0('output/', n, '/validation/figures/sampleDistances.png'), width=1920, height=1020)
   pheatmap(sampleDistMatrix,
            clustering_distance_rows=sampleDists,
            clustering_distance_cols=sampleDists,
-           col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
+           col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
+  dev.off()
+  
+  geneDists <- dist(d.validation)
+  geneDistMatrix <- as.matrix(geneDists)
+  rownames(geneDistMatrix) <- rownames(d.validation)
+  colnames(geneDistMatrix) <- rownames(d.validation)
+  png(file=paste0('output/', n, '/validation/figures/geneDistances.png'), width=1920, height=1020)
+  pheatmap(geneDistMatrix,
+           clustering_distance_rows=geneDists,
+           clustering_distance_cols=geneDists,
+           col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
   dev.off()
   
   par(mar = c(2, 1, 1, 1))
@@ -931,7 +951,7 @@ for (n in c("1","2","3")){
   #dev.off()
   
   png(file=paste0('output/', n, '/validation/figures/heatmapVST.png'), width=1920, height=1020)
-  pheatmap(d.validation.adj, cluster_rows=TRUE, show_colnames=FALSE, cluster_cols=TRUE, show_rownames = FALSE, annotation_col=as.data.frame(group))
+  pheatmap(d.validation.adj, color=my_palette, cluster_rows=TRUE, show_colnames=FALSE, cluster_cols=TRUE, show_rownames = FALSE, annotation_col=as.data.frame(group))
   dev.off()
   
   group[,1] <- as.numeric(factor(group[,1]))
@@ -953,16 +973,26 @@ for (n in c("1","2","3")){
   meanSdPlot(d.validation.adj, cex.lab = 2, cex.axis = 2, cex.main = 2)
   dev.off()
   
-  sampleDists <- dist(t(d.validation.adj))
-  sampleDistMatrix <- as.matrix(sampleDists)
-  rownames(sampleDistMatrix) <- colnames(d.validation.adj)
-  colnames(sampleDistMatrix) <- colnames(d.validation.adj)
-  colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+  sampleDists.adj <- dist(t(d.validation.adj))
+  sampleDistMatrix.adj <- as.matrix(sampleDists.adj)
+  rownames(sampleDistMatrix.adj) <- colnames(d.validation.adj)
+  colnames(sampleDistMatrix.adj) <- colnames(d.validation.adj)
   png(file=paste0('output/', n, '/validation/figures/sampleDistancesVST.png'), width=1920, height=1020)
-  pheatmap(sampleDistMatrix,
-           clustering_distance_rows=sampleDists,
-           clustering_distance_cols=sampleDists,
-           col=colors, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
+  pheatmap(sampleDistMatrix.adj,
+           clustering_distance_rows=sampleDists.adj,
+           clustering_distance_cols=sampleDists.adj,
+           col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
+  dev.off()
+  
+  geneDists.adj <- dist(d.validation.adj)
+  geneDistMatrix.adj <- as.matrix(geneDists.adj)
+  rownames(geneDistMatrix.adj) <- rownames(d.validation.adj)
+  colnames(geneDistMatrix.adj) <- rownames(d.validation.adj)
+  png(file=paste0('output/', n, '/validation/figures/geneDistancesVST.png'), width=1920, height=1020)
+  pheatmap(geneDistMatrix.adj,
+           clustering_distance_rows=geneDists.adj,
+           clustering_distance_cols=geneDists.adj,
+           col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
   dev.off()
   
   #######################################
@@ -1006,6 +1036,21 @@ for (n in c("1","2","3")){
   print(paste("DESeq2:", difftime(time2, time1, units="secs")))
   
   ###DESEQ PLOTS
+  d.validation.summary <- d.validation.summary %>% 
+    mutate(
+      Expression = case_when(log2FC >= log(2) & Pvalue <= 0.1 ~ "Up-regulated",
+                             log2FC <= -log(2) & Pvalue <= 0.1 ~ "Down-regulated",
+                             TRUE ~ "Unchanged")
+    )
+  png(file=paste0('output/', n, '/validation/figures/differential expression/volcano.png'), width=1920, height=1020)
+  print(ggplot(d.validation.summary, aes(log2FC, -log(Pvalue,10))) +
+          geom_point(aes(color = Expression), size = 2) +
+          xlab(expression("log"[2]*"FC")) + 
+          ylab(expression("-log"[10]*"Pvalue")) +
+          scale_color_manual(values = c("Up-regulated" = "red", "Down-regulated" = "blue", "Unchanged" = "grey")) +
+          guides(colour = guide_legend(override.aes = list(size=1.5))))
+  dev.off()
+  
   par(mar = c(2, 1, 1, 1))
   png(file=paste0('output/', n, '/validation/figures/differential expression/MA.png'), width=1920, height=1020)
   plotMA(res, ylim=c(-2,2), cex.lab = 2, cex.axis = 2, cex.main = 2)
@@ -1020,32 +1065,32 @@ for (n in c("1","2","3")){
   plotDispEsts(dds, cex.lab = 2, cex.axis = 2, cex.main = 2)
   dev.off()
   
-  par(mar = c(2, 1, 1, 1))
-  png(file=paste0('output/', n, '/validation/figures/differential expression/rejections.png'), width=1920, height=1020)
-  plot(metadata(res)$filterNumRej, 
-       type="b", ylab="number of rejections",
-       xlab="quantiles of filter", cex.lab = 2, cex.axis = 2, cex.main = 2)
-  lines(metadata(res)$lo.fit, col="red")
-  abline(v=metadata(res)$filterTheta)
-  dev.off()
-  
-  par(mar = c(1, 1, 1, 1))
-  png(file=paste0('output/', n, '/validation/figures/differential expression/outliers.png'), width=1920, height=1020)
-  boxplot(log10(assays(dds)[["cooks"]]), range=0, las=2, names = groups)
-  dev.off()
-  
-  par(mar = c(2, 1, 1, 1))
-  W <- res$stat
-  maxCooks <- apply(assays(dds)[["cooks"]],1,max)
-  idx <- !is.na(W)
-  png(file=paste0('output/', n, '/validation/figures/differential expression/Wald.png'), width=1920, height=1020)
-  plot(rank(W[idx]), maxCooks[idx], xlab="rank of Wald statistic", 
-       ylab="maximum Cook's distance per gene",
-       ylim=c(0,5), cex=.4, col=rgb(0,0,0,.3), cex.lab = 2, cex.axis = 2, cex.main = 2)
-  m <- ncol(dds)
-  p <- 3
-  abline(h=qf(.99, p, m - p))
-  dev.off()
+  # par(mar = c(2, 1, 1, 1))
+  # png(file=paste0('output/', n, '/validation/figures/differential expression/rejections.png'), width=1920, height=1020)
+  # plot(metadata(res)$filterNumRej, 
+  #      type="b", ylab="number of rejections",
+  #      xlab="quantiles of filter", cex.lab = 2, cex.axis = 2, cex.main = 2)
+  # lines(metadata(res)$lo.fit, col="red")
+  # abline(v=metadata(res)$filterTheta)
+  # dev.off()
+  # 
+  # par(mar = c(1, 1, 1, 1))
+  # png(file=paste0('output/', n, '/validation/figures/differential expression/outliers.png'), width=1920, height=1020)
+  # boxplot(log10(assays(dds)[["cooks"]]), range=0, las=2, names = groups)
+  # dev.off()
+  # 
+  # par(mar = c(2, 1, 1, 1))
+  # W <- res$stat
+  # maxCooks <- apply(assays(dds)[["cooks"]],1,max)
+  # idx <- !is.na(W)
+  # png(file=paste0('output/', n, '/validation/figures/differential expression/Wald.png'), width=1920, height=1020)
+  # plot(rank(W[idx]), maxCooks[idx], xlab="rank of Wald statistic", 
+  #      ylab="maximum Cook's distance per gene",
+  #      ylim=c(0,5), cex=.4, col=rgb(0,0,0,.3), cex.lab = 2, cex.axis = 2, cex.main = 2)
+  # m <- ncol(dds)
+  # p <- 3
+  # abline(h=qf(.99, p, m - p))
+  # dev.off()
   
   use <- res$baseMean > metadata(res)$filterThreshold
   h1 <- hist(res$pvalue[!use], breaks=0:50/50, plot=FALSE)
@@ -1246,7 +1291,7 @@ for (n in c("1","2","3")){
       geneNames <- mapIds(org.Hs.eg.db, keys = idsModule, column = "ENTREZID", keytype = "SYMBOL")
       goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
       if (!(is.null(goBP))){
-        if (nrow(goBP) >= 0){
+        if (nrow(goBP) > 0){
           print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust < 0.1,])))
           
           png(file=paste0('output/', n, '/validation/figures/coexpression/GO_', module, '.png'), width=1920, height=1020)
@@ -1303,11 +1348,11 @@ for (n in c("1","2","3")){
             #   # Add node to node list
             if (!i %in% result3[,1]){
               result3[nrow(result3)+1,] <- c(i, idsModule[i])
-              result4[nrow(result4)+1,] <- c(idsModule[i], log2Module[i]*(1-PModule[i]))
+              result4[nrow(result4)+1,] <- c(idsModule[i], log2Module[i])
             } 
             if (!j %in% result3[,1]){
               result3[nrow(result3)+1,] <- c(j, idsModule[j])
-              result4[nrow(result4)+1,] <- c(idsModule[j], log2Module[j]*(1-PModule[j]))
+              result4[nrow(result4)+1,] <- c(idsModule[j], log2Module[j])
             }
           }
         }
@@ -1377,7 +1422,7 @@ for (n in c("1","2","3")){
           goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
           goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
           if (!(is.null(goBP))){
-            if (nrow(goBP) >= 0){
+            if (nrow(goBP) > 0){
               print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust <= 0.1,])))
               write.table(goBP@result, file=paste0('output/', n, '/validation/output/GO/', module, 'BP.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
               BPterms <- append(BPterms, rownames(goBP@result[goBP@result$p.adjust <= 0.1,]))
@@ -1392,7 +1437,7 @@ for (n in c("1","2","3")){
             }
           }
           if (!(is.null(goMF))){
-            if (nrow(goMF) >= 0){
+            if (nrow(goMF) > 0){
               print(paste("Number of enriched molecular functions: ", nrow(goMF[goMF$p.adjust <= 0.1,])))
               write.table(goMF@result, file=paste0('output/', n, '/validation/output/GO/', module, 'MF.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
               MFterms <- append(MFterms, rownames(goMF@result[goMF@result$p.adjust <= 0.1,]))
@@ -1438,25 +1483,25 @@ similarityModules1 <- as.matrix(read.table(paste0('output/1/validation/output/si
 similarityModules2 <- as.matrix(read.table(paste0('output/2/validation/output/similarity/moduleSimilarity.tsv'), sep='\t'))
 similarityModules3 <- as.matrix(read.table(paste0('output/3/validation/output/similarity/moduleSimilarity.tsv'), sep='\t'))
 
-averageSimilarityModules1 <- mean((similarityModules1)[apply(similarityModules1,2,which.min)])
-averageSimilarityModules2 <- mean((similarityModules2)[apply(similarityModules2,2,which.min)])
-averageSimilarityModules3 <- mean((similarityModules3)[apply(similarityModules3,2,which.min)])
+averageSimilarityModules1 <- mean(apply(similarityModules1,2,max))
+averageSimilarityModules2 <- mean(apply(similarityModules2,2,max))
+averageSimilarityModules3 <- mean(apply(similarityModules3,2,max))
 
 similaritySubnetworks1 <- as.matrix(read.table(paste0('output/1/validation/output/similarity/subnetworkSimilarity.tsv'), sep='\t'))
 similaritySubnetworks2 <- as.matrix(read.table(paste0('output/2/validation/output/similarity/subnetworkSimilarity.tsv'), sep='\t'))
 similaritySubnetworks3 <- as.matrix(read.table(paste0('output/3/validation/output/similarity/subnetworkSimilarity.tsv'), sep='\t'))
 
-averageSimilaritySubnetworks1 <- mean((similaritySubnetworks1)[apply(similaritySubnetworks1,2,which.min)])
-averageSimilaritySubnetworks2 <- mean((similaritySubnetworks2)[apply(similaritySubnetworks2,2,which.min)])
-averageSimilaritySubnetworks3 <- mean((similaritySubnetworks3)[apply(similaritySubnetworks3,2,which.min)])
+averageSimilaritySubnetworks1 <- mean(apply(similaritySubnetworks1,2,max))
+averageSimilaritySubnetworks2 <- mean(apply(similaritySubnetworks2,2,max))
+averageSimilaritySubnetworks3 <- mean(apply(similaritySubnetworks3,2,max))
 
 similaritySSubnetworks1 <- as.matrix(read.table(paste0('output/1/validation/output/similarity/sSubnetworkSimilarity.tsv'), sep='\t'))
 similaritySSubnetworks2 <- as.matrix(read.table(paste0('output/2/validation/output/similarity/sSubnetworkSimilarity.tsv'), sep='\t'))
 similaritySSubnetworks3 <- as.matrix(read.table(paste0('output/3/validation/output/similarity/sSubnetworkSimilarity.tsv'), sep='\t'))
 
-averageSimilaritySSubnetworks1 <- mean((similaritySSubnetworks1)[apply(similaritySSubnetworks1,2,which.min)])
-averageSimilaritySSubnetworks2 <- mean((similaritySSubnetworks2)[apply(similaritySSubnetworks2,2,which.min)])
-averageSimilaritySSubnetworks3 <- mean((similaritySSubnetworks3)[apply(similaritySSubnetworks3,2,which.min)])
+averageSimilaritySSubnetworks1 <- mean(apply(similaritySSubnetworks1,2,max))
+averageSimilaritySSubnetworks2 <- mean(apply(similaritySSubnetworks2,2,max))
+averageSimilaritySSubnetworks3 <- mean(apply(similaritySSubnetworks3,2,max))
 
 resultSimilarity1 <- as.matrix(read.table(paste0('output/1/validation/output/similarity/similarity.tsv'), sep='\t'))
 resultSimilarity2 <- as.matrix(read.table(paste0('output/2/validation/output/similarity/similarity.tsv'), sep='\t'))
@@ -1481,49 +1526,133 @@ png(file=paste0('output/similarity.png'), width=1920, height=1020)
 boxplot(end, main = 'Average similarity')
 dev.off()
 
+R1 <- data.frame(Type=character(0), Similarity=numeric(0))
+for (l in apply(similarityModules1,2,max)){
+  R1[nrow(R1) + 1,] <-  c('Module', as.numeric(l))
+}
+for (l in apply(similaritySubnetworks1,2,max)){
+  R1[nrow(R1) + 1,] <- c('Subnetwork', as.numeric(l))
+}
+for (l in apply(similaritySSubnetworks1,2,max)){
+  R1[nrow(R1) + 1,] <- c('Significant subnetwork', as.numeric(l))
+}
+
+R1[nrow(R1) + 1,] <- c('GO genes', as.numeric(resultSimilarity1['genes',1]))
+R1[nrow(R1) + 1,] <- c('GO BP', as.numeric(resultSimilarity1['BP',1]))
+R1[nrow(R1) + 1,] <- c('GO MF', as.numeric(resultSimilarity1['MF',1]))
+R1[nrow(R1) + 1,] <- c('GSEA BP', as.numeric(GSEASimilarity1['BP',1]))
+R1[nrow(R1) + 1,] <- c('GSEA MF', as.numeric(GSEASimilarity1['MF',1]))
+
+R1$Similarity <- as.numeric(R1$Similarity)
+
+png(file='output/1/validation/figures/similarity/violin.png', width=1920, height=1020)
+ggplot(R1, aes(x=Type, y=Similarity, fill=Type)) + 
+  geom_violin() +
+  geom_boxplot(width=0.1, color="white") +
+  geom_dotplot(binaxis='y', stackdir='center', dotsize=0.75, color = 'black', binwidth = 1/100) +
+  scale_y_continuous(name = "Similarity", limits=c(0,1), breaks=c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,1)) +
+  scale_x_discrete(limits=c("Module", "Subnetwork", "Significant subnetwork", 'GO genes', 'GO BP', 'GO MF', 'GSEA BP', 'GSEA MF'))
+dev.off()
+
+R2 <- data.frame(Type=character(0), Similarity=numeric(0))
+for (l in apply(similarityModules2,2,max)){
+  R2[nrow(R2) + 1,] <-  c('Module', as.numeric(l))
+}
+for (l in apply(similaritySubnetworks2,2,max)){
+  R2[nrow(R2) + 1,] <- c('Subnetwork', as.numeric(l))
+}
+for (l in apply(similaritySSubnetworks1,2,max)){
+  R2[nrow(R2) + 1,] <- c('Significant subnetwork', as.numeric(l))
+}
+
+R2[nrow(R2) + 1,] <- c('GO genes', as.numeric(resultSimilarity1['genes',1]))
+R2[nrow(R2) + 1,] <- c('GO BP', as.numeric(resultSimilarity1['BP',1]))
+R2[nrow(R2) + 1,] <- c('GO MF', as.numeric(resultSimilarity1['MF',1]))
+R2[nrow(R2) + 1,] <- c('GSEA BP', as.numeric(GSEASimilarity1['BP',1]))
+R2[nrow(R2) + 1,] <- c('GSEA MF', as.numeric(GSEASimilarity1['MF',1]))
+
+R2$Similarity <- as.numeric(R2$Similarity)
+
+png(file='output/2/validation/figures/similarity/violin.png', width=1920, height=1020)
+ggplot(R2, aes(x=Type, y=Similarity, fill=Type)) + 
+  geom_violin() + 
+  geom_boxplot(width=0.1, color="white") +
+  geom_dotplot(binaxis='y', stackdir='center', dotsize=0.75, color = 'black', binwidth = 1/100) +
+  scale_y_continuous(name = "Similarity", limits=c(0,1), breaks=c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,1)) +
+  scale_x_discrete(limits=c("Module", "Subnetwork", "Significant subnetwork", 'GO genes', 'GO BP', 'GO MF', 'GSEA BP', 'GSEA MF'))
+dev.off()
+
+R3 <- data.frame(Type=character(0), Similarity=numeric(0))
+for (l in apply(similarityModules3,2,max)){
+  R3[nrow(R3) + 1,] <-  c('Module', as.numeric(l))
+}
+for (l in apply(similaritySubnetworks3,2,max)){
+  R3[nrow(R3) + 1,] <- c('Subnetwork', as.numeric(l))
+}
+for (l in apply(similaritySSubnetworks3,2,max)){
+  R3[nrow(R3) + 1,] <- c('Significant subnetwork', as.numeric(l))
+}
+
+R3[nrow(R3) + 1,] <- c('GO genes', as.numeric(resultSimilarity3['genes',1]))
+R3[nrow(R3) + 1,] <- c('GO BP', as.numeric(resultSimilarity3['BP',1]))
+R3[nrow(R3) + 1,] <- c('GO MF', as.numeric(resultSimilarity3['MF',1]))
+R3[nrow(R3) + 1,] <- c('GSEA BP', as.numeric(GSEASimilarity3['BP',1]))
+R3[nrow(R3) + 1,] <- c('GSEA MF', as.numeric(GSEASimilarity3['MF',1]))
+
+R3$Similarity <- as.numeric(R3$Similarity)
+
+png(file='output/3/validation/figures/similarity/violin.png', width=1920, height=1020)
+ggplot(R3, aes(x=Type, y=Similarity, fill=Type)) + 
+  geom_violin() + 
+  geom_boxplot(width=0.1, color="white") +
+  geom_dotplot(binaxis='y', stackdir='center', dotsize=0.75, color = 'black', binwidth = 1/100) +
+  scale_y_continuous(name = "Similarity", limits=c(0,1), breaks=c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,1)) +
+  scale_x_discrete(limits=c("Module", "Subnetwork", "Significant subnetwork", 'GO genes', 'GO BP', 'GO MF', 'GSEA BP', 'GSEA MF'))
+dev.off()
+
 modules1 <- data.frame(matrix(nrow = length(colnames(similarityModules1)), ncol = 5))
 rownames(modules1) <- colnames(similarityModules1)
 colnames(modules1) <- c('Name1', 'Name2', 'Similarity', 'Size1', 'Size2')
 modules1[, 'Name1'] <- rownames(modules1)
-modules1[, 'Name2'] <- rownames(similarityModules1)[apply(similarityModules1,2,which.min)]
-modules1[, 'Similarity'] <- apply(similarityModules1,2,min)
+modules1[, 'Name2'] <- rownames(similarityModules1)[apply(similarityModules1,2,which.max)]
+modules1[, 'Similarity'] <- apply(similarityModules1,2,max)
 for (i in 1:nrow(modules1)){
   modules1[i, 'Size1'] <- length(as.vector(t(read.table(paste0('output/1/training/output/coexpression/', row.names(modules1[i,]), '.tsv'), sep='\t', header = FALSE))))
   modules1[i, 'Size2'] <- length(as.vector(t(read.table(paste0('output/1/validation/output/coexpression/', modules1[i, 'Name2'], '.tsv'), sep='\t', header = FALSE))))
 }
-png(file=paste0('output/1/validation/figures/similarity/modules.png'), width=1920, height=1020)
+png(file='output/1/validation/figures/similarity/moduleSize.png', width=1920, height=1020)
 ggplot(modules1, aes(x=Size1,y=Similarity)) + 
-  geom_point(aes(size=Size2, colour = Name1, shape = Name2))
+  geom_point(aes(size=Size2, colour = Name1))
 dev.off()
 
 modules2 <- data.frame(matrix(nrow = length(colnames(similarityModules2)), ncol = 5))
 rownames(modules2) <- colnames(similarityModules2)
 colnames(modules2) <- c('Name1', 'Name2', 'Similarity', 'Size1', 'Size2')
 modules2[, 'Name1'] <- rownames(modules2)
-modules2[, 'Name2'] <- rownames(similarityModules2)[apply(similarityModules2,2,which.min)]
-modules2[, 'Similarity'] <- apply(similarityModules2,2,min)
+modules2[, 'Name2'] <- rownames(similarityModules2)[apply(similarityModules2,2,which.max)]
+modules2[, 'Similarity'] <- apply(similarityModules2,2,max)
 for (i in 1:nrow(modules2)){
   modules2[i, 'Size1'] <- length(as.vector(t(read.table(paste0('output/2/training/output/coexpression/', row.names(modules2[i,]), '.tsv'), sep='\t', header = FALSE))))
   modules2[i, 'Size2'] <- length(as.vector(t(read.table(paste0('output/2/validation/output/coexpression/', modules2[i, 'Name2'], '.tsv'), sep='\t', header = FALSE))))
 }
-png(file=paste0('output/2/validation/figures/similarity/modules.png'), width=1920, height=1020)
+png(file='output/2/validation/figures/similarity/moduleSize.png', width=1920, height=1020)
 ggplot(modules2, aes(x=Size1,y=Similarity)) + 
-  geom_point(aes(size=Size2, colour = Name1, shape = Name2))
+  geom_point(aes(size=Size2, colour = Name1))
 dev.off()
 
 modules3 <- data.frame(matrix(nrow = length(colnames(similarityModules3)), ncol = 5))
 rownames(modules3) <- colnames(similarityModules3)
 colnames(modules3) <- c('Name1', 'Name2', 'Similarity', 'Size1', 'Size2')
 modules3[, 'Name1'] <- rownames(modules3)
-modules3[, 'Name2'] <- rownames(similarityModules3)[apply(similarityModules3,2,which.min)]
-modules3[, 'Similarity'] <- apply(similarityModules3,2,min)
+modules3[, 'Name2'] <- rownames(similarityModules3)[apply(similarityModules3,2,which.max)]
+modules3[, 'Similarity'] <- apply(similarityModules3,2,max)
 for (i in 1:nrow(modules3)){
   modules3[i, 'Size1'] <- length(as.vector(t(read.table(paste0('output/3/training/output/coexpression/', row.names(modules3[i,]), '.tsv'), sep='\t', header = FALSE))))
   modules3[i, 'Size2'] <- length(as.vector(t(read.table(paste0('output/3/validation/output/coexpression/', modules3[i, 'Name2'], '.tsv'), sep='\t', header = FALSE))))
 }
-png(file=paste0('output/3/validation/figures/similarity/modules.png'), width=1920, height=1020)
+png(file='output/3/validation/figures/similarity/moduleSize.png', width=1920, height=1020)
 ggplot(modules3, aes(x=Size1,y=Similarity)) + 
-  geom_point(aes(size=Size2, colour = Name1, shape = Name2))
+  geom_point(aes(size=Size2, colour = Name1))
 dev.off()
 
 print(paste('Similarity for modules across runs:', mean(c(averageSimilarityModules1, averageSimilarityModules2, averageSimilarityModules3))))

@@ -105,11 +105,17 @@ similarity.analysis <- function(folder1, folder2, outfolder){
   overallSimilarity <- matrix(0, nrow=3, ncol=1)
   rownames(overallSimilarity) <- c('genes', 'BP', 'MF')
   
+  write.table(sSubnetworks, file=paste0(outfolder, '/sSubnetworkSimilarity.tsv'), row.names=TRUE, col.names=TRUE, sep='\t')
+  write.table(overallSimilarity, file=paste0(outfolder, '/similarity.tsv'), row.names=TRUE, sep='\t')
+  
   if (file.info(paste0(folder1, '/GO/subnetworks.tsv'))$size != 0 && file.info(paste0(folder2, '/GO/subnetworks.tsv'))$size != 0) {
     colorsA <- as.vector(t(read.table(paste0(folder1, '/GO/subnetworks.tsv'), sep='\t', header = FALSE)))
     colorsB <- as.vector(t(read.table(paste0(folder2, '/GO/subnetworks.tsv'), sep='\t', header = FALSE)))
     exclusiveA <- colorsA[!(colorsA == 'grey')]
     exclusiveB <- colorsB[!(colorsB == 'grey')]
+    sSubnetworks <- matrix(0, ncol = length(exclusiveA), nrow = length(exclusiveB))
+    colnames(sSubnetworks) <- exclusiveA
+    rownames(sSubnetworks) <- exclusiveB
     for (colorA in exclusiveA){
       best <- 0
       bestColor <- ""
@@ -157,7 +163,7 @@ similarity.analysis <- function(folder1, folder2, outfolder){
       print(paste('Similarity for molecular functions:', Jaccard_Similarity))
       overallSimilarity['MF',1] <- Jaccard_Similarity
     }
+    write.table(sSubnetworks, file=paste0(outfolder, '/sSubnetworkSimilarity.tsv'), row.names=TRUE, col.names=TRUE, sep='\t')
+    write.table(overallSimilarity, file=paste0(outfolder, '/similarity.tsv'), row.names=TRUE, sep='\t')
   }
-  write.table(sSubnetworks, file=paste0(outfolder, '/sSubnetworkSimilarity.tsv'), row.names=TRUE, col.names=TRUE, sep='\t')
-  write.table(overallSimilarity, file=paste0(outfolder, '/similarity.tsv'), row.names=TRUE, sep='\t')
 }
