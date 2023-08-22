@@ -2,10 +2,6 @@
 ### preparatory steps to check for sample outliers etc. As these are very specific to the input data, we have not included them
 ### as part of the workflow here but instead assume these have been followed already. We recommend going back to the original
 ### documentation for the quality check (and also the general workflow, as we generally followed their guidelines):
-### Coexpression analysis workflow using the WGCNA package. The WGCNA package has a tutorial itself, which also includes some
-### preparatory steps to check for sample outliers etc. As these are very specific to the input data, we have not included them
-### as part of the workflow here but instead assume these have been followed already. We recommend going back to the original
-### documentation for the quality check (and also the general workflow, as we generally followed their guidelines):
 ### (https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/Tutorials/)
 ### The quality check for our dataset can be found in "coexpression_analysis_prep.R"
 
@@ -16,7 +12,7 @@
 #' @param outfolder Output folder for figures
 #' @return Coexpression network of \code{d} and significance of log2FC value distribution(s) within each of the modules
 
-coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE){
+coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, i, stage, power=FALSE){
   # Pick acceptable value for beta
   # Choose a set of soft-thresholding powers (beta)
   powers <- c(c(1:11), seq(from=12, to=26, by=2))
@@ -30,8 +26,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
   plot(soft.tresh $fitIndices[,1], -sign(soft.tresh $fitIndices[,3])*soft.tresh $fitIndices[,2], xlab="Beta",ylab="Scale Free Topology Model Fit, R^2",type="n", main = paste("Scale independence"))
   text(soft.tresh $fitIndices[,1], -sign(soft.tresh $fitIndices[,3])*soft.tresh $fitIndices[,2], labels=powers,cex=cex1,col="red")
   # this line corresponds to using an R^2 cut-off of h
-  abline(h=0.80,col="blue")
-  abline(h=0.90,col="red")
+  abline(h=0.80,col="red")
   # Mean connectivity as a function of beta
   plot(soft.tresh $fitIndices[,1], soft.tresh $fitIndices[,5], xlab="Beta", ylab="Mean Connectivity", type="n", main = paste("Mean connectivity"))
   text(soft.tresh $fitIndices[,1], soft.tresh $fitIndices[,5], labels=powers, cex=cex1,col="red")
@@ -42,21 +37,36 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
     # Pick first value where scale independence is higher than 0.8
     sf.values <- -sign(soft.tresh $fitIndices[,3])*soft.tresh $fitIndices[,2]
     sf.values2 <- -sign(soft.tresh $fitIndices[,5])
-    sf.bool <- sf.values > 0.9
-    sf.bool <- sf.bool & (sf.values2 < 150)
+    #power <- 0
+    
+    #    for (i in 1:length(sf.values)){
+    #      print(sf.values[i])
+    #      if (sf.values[i] > 0.9 && sf.values[i] > sf.values[i-1] && sf.values[i] > sf.values[i+1]){
+    #        power <- i
+    #        break
+    #      }
+    #    }
+    threshold <- 0.8
+    print(paste0("Threshold: ", threshold))
+    sf.bool <- sf.values > threshold
+    sf.bool <- sf.bool & (sf.values2 < 100)
     power <- soft.tresh $fitIndices[,1][sf.bool][1]
   }
-  print(power)
+  print(paste0("Power : ", power))
   # Create network from chosen value of beta
   rownames(d) <- paste(rownames(d), length(groups), sep='_')
   #  allowWGCNAThreads(nThreads = NULL)
   #  enableWGCNAThreads(nThreads = NULL)
   #  print(WGCNAnThreads())
+  dSplit <- 2
+  mergeCut <- 0.25
+  print(paste0("deepSplit: ", dSplit))
+  print(paste0("mergeCutHeight: ", mergeCut))
   coex.net <- blockwiseModules(d, power=power,
                                TOMType="unsigned", minModuleSize=30,
-                               reassignThreshold=0, mergeCutHeight=0.25,
-                               numericLabels=TRUE, pamRespectsDendro=FALSE, deepSplit = 4,
-                               saveTOMs=TRUE, saveTOMFileBase="rdata/coexpression_discovery", verbose=3, maxBlockSize=nrow(d.summary))
+                               reassignThreshold=0, mergeCutHeight=mergeCut,
+                               numericLabels=TRUE, pamRespectsDendro=FALSE, deepSplit = dSplit,
+                               saveTOMs=TRUE, saveTOMFileBase=paste0("output/", i, "/", stage, "/rdata/coexpression_discovery"), verbose=3, maxBlockSize=ncol(d))
   # Merge M18 (lightgreen) into M9 (magenta), since they were highly similar
   # coex.net$colors <- replace(coex.net$colors, coex.net$colors==18, 9)
   # Plot modules and gene hierarchical clustering
@@ -86,7 +96,7 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, power=FALSE
     par(mar = c(2, 1, 1, 1))
     png(paste0(figfolder, '/ME_distribution_', i, '_', module, '.png'), width=1920, height=1080)
     boxplot(ME.SNV[,paste0('ME', i)], ME.WT[,paste0('ME', i)], names=c('SNV', 'WT'),
-            col=module, xlab='group', ylab='ME value', cex.lab = 2, cex.axis = 2, cex.main = 2)
+            col=module, xlab='group', ylab='ME value', cex.lab = 2, cex.axis = 2, cex.main = 2, cex.colorLabels = 2)
     dev.off()
     # Calculate if distribution of log2FC values between the groups are significantly different from zero in each module
     #pval.modules <- data.frame()
@@ -218,7 +228,7 @@ GO.terms.modules <- function(coex.net, IDs, log2values, entrez.ids, fig.folder, 
     
     # Check for very large overlap in GO terms (i.e. GO terms that are probably related)
     #print(head(rownames(d.GO)))
-    terms.mapping <- select(GO.db, keys=rownames(d.GO), columns='GOID', keytype='TERM')
+    terms.mapping <- AnnotationDbi::select(GO.db, keys=rownames(d.GO), columns='GOID', keytype='TERM')
     terms.mapping$print <- rep(TRUE, nrow(terms.mapping))
     for (j in 1:nrow(terms.mapping)) {
       ID <- terms.mapping$GOID[j]

@@ -40,7 +40,9 @@ betaBinomial <- function(d, ids, groups, g1, g2, test.type='two.sided'){
   sign <- data.frame(HGCN=ids, Log2ratio=mean.diff, Pvalue=result$p.value, row.names=ids)
   sign <- sign[order(sign$Pvalue, decreasing=FALSE),]
   # Fit BUM model
+  png(file=paste0('figures/differential expression/pval.png'), width=1920, height=1020)
   bum <- fitBumModel(result$p.value, plot=TRUE)
+  dev.off()
   # Pick P-value threshold with given FDR value
   thresholds <- data.frame(Pvalues=c(0.01, 0.05, 0.1, 0.2), counts=rep(NA, 4))
   colnames(thresholds) <- c(paste(g2, 'vs', g1, 'Pvalue', sep='_'), paste(g2, 'vs', g1, 'sign', sep='_'))
