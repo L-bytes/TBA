@@ -3,9 +3,9 @@ This is the codebase for the Master thesis of M. van Laar.
 The main branch is for local use, but it does not run well on a normal computer.
 
 Instructions for local use:
-1. Install R (4.2) and Python (3.5)
+1. Install R (4.2), Python (3.5), Ubuntu (16.04 LTS) and GNU parallel
    
-2. Install neccessary packages:
+2. Install neccessary R packages:
    BiocManager
    BiocParallel
    BioNet
