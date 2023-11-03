@@ -4,6 +4,9 @@ The main branch is for local use, but it does not run well on a normal computer.
 
 The mutation variations file is too big to be uploaded onto GitHub, so it can be downloaded and added to the data folder from: https://drive.google.com/file/d/1vWALr6PEFi3uZCPEj0Vo5CgmcyUzZlzK/view?usp=sharing
 
+Make sure to convert the Project.sh and run_hierarchicalHotnet_modules.sh to Unix format (in Linux) after downloading:
+> dos2unix filename
+
 Instructions for local use:
 1. Install R (4.2), Python (3.5), Ubuntu (16.04 LTS) and GNU parallel
    
