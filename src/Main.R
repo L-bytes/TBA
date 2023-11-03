@@ -1,7 +1,7 @@
 argv = commandArgs(trailingOnly=TRUE)
 startTime <- Sys.time()
 #######################################
-#####          Packages           #####
+###      Load required packages     ###
 #######################################
 library(ibb)
 library(stringr)
@@ -111,6 +111,9 @@ colnames(d.adj) <- samples
 d.raw <- d.raw[,keepSamples]
 group.data <- group.data[keepSamples,]
 
+time2 <- Sys.time()
+print(paste("Processing data:", difftime(time2, time1, units="secs")))
+
 count_sd_data <- data.frame(
   count = rowMeans(d.raw),
   deviation = apply(d.raw, 1, sd)
@@ -185,1447 +188,756 @@ print(ggplot(means_data, aes(x = samples, y = means, fill=samples)) +
         guides(fill = FALSE))
 dev.off()
   
+#  d.norm <- normalize.sample(d.raw)
+#  d.cs <- normalize.cs(d.norm)
+#
+### PLOTS
+#
+#  d.cs <- d.cs[,keepSamples]
+#  d.cs.WT <- d.cs[,rownames(group.data[group.data[,hit] == "WT",])]
+#  d.cs.SNV <- d.cs[,rownames(group.data[group.data[,hit] == "SNV",])]
+#  
+#  colors = c(seq(-5,-1,length=1000),seq(-.999999,.999999,length=1000),seq(1, 5,length=1000))
+#  my_palette <- colorRampPalette(c("blue", "white", "red"))(n = 2999)
+#  
+#  png(file=paste0('output/heatmap.png'), width=1920, height=1020)
+#    pheatmap(d.cs, color=my_palette, cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, show_colnames = FALSE, annotation_col=as.data.frame(group), cex.lab = 2, cex.axis = 2, cex.main = 2)
+#  dev.off()
+#  
+#  png(file=paste0('output/heatmapSNV.png'), width=1920, height=1020)
+#    pheatmap(d.cs.SNV,
+#             legend=TRUE,
+#             color=my_palette,
+#             breaks=colors,
+#             show_rownames=FALSE,
+#             show_colnames=FALSE
+#    )
+#  dev.off()
+#  
+#  png(file=paste0('output/heatmapWT.png'), width=1920, height=1020)
+#    pheatmap(d.cs.WT,
+#             legend=TRUE,
+#             color=my_palette,
+#             breaks=colors,
+#             show_rownames=FALSE,
+#             show_colnames=FALSE
+#    )
+#  dev.off()
+#
+# foreach(hit = hits, .packages = packages) %dopar% {
 for (n in c("1","2","3")){
-  #foreach(hit = hits, .packages = packages) %dopar% {
+  
   dir.create(paste0('output/', n))
-  dir.create(paste0('output/', n, '/training'))
-  dir.create(paste0('output/', n, '/training/output'))
-  dir.create(paste0('output/', n, '/training/figures'))
-  dir.create(paste0('output/', n, '/training/rdata'))
   
-  selection <- sample(colnames(d.raw), floor(ncol(d.raw)/2))
-  selection <- sort(selection)
-  save(selection, file=paste0('output/' , n, '/training/rdata/sampleSelection.RData'))
-  
-  d.training <- d.raw[,selection]
-  samples <- colnames(d.training)
-  ids <- rownames(d.training)
-  group.data.training <- group.data[selection,]
-  groups <- group.data.training[,hit]
-  d.training.adj <- d.adj[,selection]
-  colnames(d.training.adj) <- samples
-  
-  time2 <- Sys.time()
-  print(paste("Processing data:", difftime(time2, time1, units="secs")))
-  
-  group <- as.matrix(group.data.training[,hit])
-  rownames(group) <- rownames(group.data.training)
-  colnames(group) <- c(hit)
-  
-  #  d.norm <- normalize.sample(d.raw)
-  #  d.cs <- normalize.cs(d.norm)
-  #
-  ### PLOTS
-  #
-  #  d.cs <- d.cs[,keepSamples]
-  #  d.cs.WT <- d.cs[,rownames(group.data[group.data[,hit] == "WT",])]
-  #  d.cs.SNV <- d.cs[,rownames(group.data[group.data[,hit] == "SNV",])]
-  #  
-  #  colors = c(seq(-5,-1,length=1000),seq(-.999999,.999999,length=1000),seq(1, 5,length=1000))
-  #  my_palette <- colorRampPalette(c("blue", "white", "red"))(n = 2999)
-  #  
-  #  png(file=paste0('output/heatmap.png'), width=1920, height=1020)
-  #    pheatmap(d.cs, color=my_palette, cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, show_colnames = FALSE, annotation_col=as.data.frame(group), cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #  dev.off()
-  #  
-  #  png(file=paste0('output/heatmapSNV.png'), width=1920, height=1020)
-  #    pheatmap(d.cs.SNV,
-  #             legend=TRUE,
-  #             color=my_palette,
-  #             breaks=colors,
-  #             show_rownames=FALSE,
-  #             show_colnames=FALSE
-  #    )
-  #  dev.off()
-  #  
-  #  png(file=paste0('output/heatmapWT.png'), width=1920, height=1020)
-  #    pheatmap(d.cs.WT,
-  #             legend=TRUE,
-  #             color=my_palette,
-  #             breaks=colors,
-  #             show_rownames=FALSE,
-  #             show_colnames=FALSE
-  #    )
-  #  dev.off()
-  #
-  #  d.training.cs <- d.cs[,selection]
-  #  d.training.cs.WT <- d.training.cs[,rownames(group.data.training[group.data.training[,hit] == "WT",])]
-  #  d.training.cs.SNV <- d.training.cs[,rownames(group.data.training[group.data.training[,hit] == "SNV",])]
-  #  
-  #  png(file=paste0('output/', n, '/training/figures/heatmapSNVSubset.png'), width=1920, height=1020)
-  #    pheatmap(d.training.cs.SNV,
-  #             legend=TRUE,
-  #             color=my_palette,
-  #             breaks=colors,
-  #             show_rownames=FALSE,
-  #             show_colnames=FALSE
-  #    )
-  #  dev.off()
-  #  
-  #  png(file=paste0('output/', n, '/training/figures/heatmapWTSubset.png'), width=1920, height=1020)
-  #    pheatmap(d.training.cs.WT,
-  #             legend=TRUE,
-  #             color=my_palette,
-  #             breaks=colors,
-  #             show_rownames=FALSE,
-  #             show_colnames=FALSE
-  #    )
-  #  dev.off()   
-  #
-  #  png(file=paste0('output/', n, '/training/figures/heatmap.png'), width=1920, height=1020)
-  #    pheatmap(d.training.cs, color=my_palette, cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, show_colnames = FALSE, annotation_col=as.data.frame(group), cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #  dev.off()
-  
-  colnames(d.training) <- groups
-  
-  #  png(file=paste0('output/', n, '/training/figures/sampleCluster.png'), width=1920, height=1020)
-  #    plotClusterTreeSamples(t(d.training), as.numeric(factor(groups)), cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #  dev.off()
-  #  
-  #  sampleDists <- dist(t(d.training))
-  #  sampleDistMatrix <- as.matrix(sampleDists)
-  #  rownames(sampleDistMatrix) <- colnames(d.training)
-  #  colnames(sampleDistMatrix) <- colnames(d.training)
-  #  png(file=paste0('output/', n, '/training/figures/sampleDistances.png'), width=1920, height=1020)
-  #    pheatmap(sampleDistMatrix,
-  #             clustering_distance_rows=sampleDists,
-  #             clustering_distance_cols=sampleDists,
-  #             col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
-  #  dev.off()
-  #  
-  #  geneDists <- dist(d.training)
-  #  geneDistMatrix <- as.matrix(geneDists)
-  #  rownames(geneDistMatrix) <- rownames(d.training)
-  #  colnames(geneDistMatrix) <- rownames(d.training)
-  #  png(file=paste0('output/', n, '/training/figures/geneDistances.png'), width=1920, height=1020)
-  #    pheatmap(geneDistMatrix,
-  #             clustering_distance_rows=geneDists,
-  #             clustering_distance_cols=geneDists,
-  #             col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
-  #  dev.off()
-  #
-  #  png(file=paste0('output/', n, '/training/figures/meanExpressionSelection.png'), width=1920, height=1020)
-  #  barplot(apply(t(d.training),1,mean, na.rm=T),
-  #          xlab = "Sample", ylab = "Mean expression",
-  #          main ="Mean expression across samples", cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #  dev.off()
-  #  
-  #  png(file=paste0('output/', n, '/training/figures/heatmapVST.png'), width=1920, height=1020)
-  #    pheatmap(d.training.adj, color=my_palette, cluster_rows=TRUE, show_colnames=FALSE, cluster_cols=TRUE, show_rownames = FALSE, annotation_col=as.data.frame(group))
-  #  dev.off()
-  
-  colnames(d.training.adj) <- groups
-  
-  #  png(file=paste0('output/', n, '/training/figures/sampleClusterVST.png'), width=1920, height=1020)
-  #    plotClusterTreeSamples(t(d.training.adj), as.numeric(factor(groups)), cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #  dev.off()
-  #  
-  #  sampleDists.adj <- dist(t(d.training.adj))
-  #  sampleDistMatrix.adj <- as.matrix(sampleDists.adj)
-  #  rownames(sampleDistMatrix.adj) <- colnames(d.training.adj)
-  #  colnames(sampleDistMatrix.adj) <- colnames(d.training.adj)
-  #  png(file=paste0('output/', n, '/training/figures/sampleDistancesVST.png'), width=1920, height=1020)
-  #    pheatmap(sampleDistMatrix.adj,
-  #             clustering_distance_rows=sampleDists.adj,
-  #             clustering_distance_cols=sampleDists.adj,
-  #             col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
-  #  dev.off()
-  #  
-  #  geneDists.adj <- dist(d.training.adj)
-  #  geneDistMatrix.adj <- as.matrix(geneDists.adj)
-  #  rownames(geneDistMatrix.adj) <- rownames(d.training.adj)
-  #  colnames(geneDistMatrix.adj) <- rownames(d.training.adj)
-  #  png(file=paste0('output/', n, '/training/figures/geneDistancesVST.png'), width=1920, height=1020)
-  #    pheatmap(geneDistMatrix.adj,
-  #             clustering_distance_rows=geneDists.adj,
-  #             clustering_distance_cols=geneDists.adj,
-  #             col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
-  #  dev.off()
-  #
-  #  png(file=paste0('output/', n, '/training/figures/meanExpressionSelectionVST.png'), width=1920, height=1020)
-  #  barplot(apply(t(d.training.adj),1,mean, na.rm=T),
-  #          xlab = "Sample", ylab = "Mean expression",
-  #          main ="Mean expression across samples", cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #  dev.off()
-  
-  ### Save input data
-  save(d.training, d.training.adj, group.data.training, group, file=(paste0('output/', n, '/training/rdata/input_data.RData')))
-  
-  #######################################
-  #######         DESeq2           ######
-  #######################################
-  dir.create(paste0('output/', n, '/training/figures/differential expression'))
-  dir.create(paste0('output/', n, '/training/output/differential expression'))
-  
-  time1 <- Sys.time()
-  colnames(d.training) <- samples
-  group[,1] <- factor(group[,1], levels = c("WT","SNV"))
-  dds <- DESeqDataSetFromMatrix(countData = d.training, colData = group, design = formula(paste("~",hit)))
-  dds
-  dds <- DESeq(dds)
-  res <- results(dds)
-  res
-  summary(res)
-  
-  colnames(d.training) <- groups
-  
-  d.training.summary <- data.frame(unlist(res$log2FoldChange), unlist(res$padj), row.names = rownames(res))
-  colnames(d.training.summary) <- c("log2FC", "Pvalue")
-  d.training.summary <- na.omit(d.training.summary)
-  d.training.adj <- d.training.adj[rownames(d.training.adj) %in% rownames(d.training.summary),]
-  ids <- rownames(d.training.adj)
-  
-  time2<- Sys.time()
-  print(paste("DESeq2:", difftime(time2, time1, units="secs")))
-  
-  write.table(d.training.summary[,"log2FC", drop = FALSE], file=paste0('output/', n, '/training/output/differential expression/DE_LFC.tsv'), row.names=TRUE, col.names=TRUE, sep='\t')
-  
-  ###DESEQ PLOTS
-  d.training.summary2 <- d.training.summary %>% 
-    mutate(
-      Expression = case_when(log2FC >= 0.1 & Pvalue <= 0.1 ~ "Up-regulated",
-                             log2FC <= -0.1 & Pvalue <= 0.1 ~ "Down-regulated",
-                             TRUE ~ "Unchanged")
-    ) %>%
-    arrange(desc(log2FC))
-  
-  d.training.summary2 <- cbind(gene=rownames(d.training.summary2), d.training.summary2)
-  
-  png(file=paste0('output/', n, '/training/figures/differential expression/volcano.png'), width=1920, height=1020)
-  print(ggplot(d.training.summary2, aes(log2FC, -log(Pvalue,10))) +
-          geom_point(aes(color = Expression), size = 2) +
-          xlab(expression("log"[2]*"FC")) + 
-          ylab(expression("-log"[10]*"adjusted p-value")) +
-          scale_color_manual(values = c("Up-regulated" = "red", "Down-regulated" = "blue", "Unchanged" = "grey")) +
-          scale_x_continuous(
-            limits = c(-4, 4),
-            breaks = seq(-4, 4, by = 0.5),
-            guide = "prism_minor") +
-          scale_y_continuous(
-            limits = c(0, 15),
-            breaks = seq(0, 15, by = 3)) +
-          geom_label_repel(data=head(filter(d.training.summary2, Pvalue<=0.1),10), aes(label=gene,fontface='bold',segment.size=1), box.padding = 0.5, size=6, xlim  = c(3,4), min.segment.length = 0) +
-          geom_label_repel(data=tail(filter(d.training.summary2, Pvalue<=0.1),10), aes(label=gene,fontface='bold',segment.size=1), box.padding = 0.5, size=6, xlim  = c(-4,-3), min.segment.length = 0) +
-          guides(colour = guide_legend(override.aes = list(size=3))) +
-          theme_prism(border=TRUE,base_size = 25) +
-          theme(legend.key.height = unit(30, "pt"),
-                legend.title = element_text(size=25),
-                legend.text = element_text(size=25),
-                legend.margin = margin(0, 30, 0, 0)) +
-          labs(title = "DESeq2 log-fold changes and p-values"))
-  dev.off()
-  
-  dds2 <- as.data.frame(mcols(dds)) %>% 
-    select(baseMean, dispGeneEst, dispFit, dispersion) %>% 
-    melt(id.vars="baseMean") %>% 
-    filter(baseMean>0) %>%
-    arrange(factor(variable, levels=c("dispGeneEst","dispersion","dispFit")))
-  
-  png(file=paste0('output/', n, '/training/figures/differential expression/dispersion.png'), width=1920, height=1020)
-  print(ggplot(dds2, aes(x=baseMean, y=value, colour=variable)) + 
-          geom_point(size=1.5) +
-          scale_x_log10() + 
-          scale_y_log10() + 
-          theme_bw() + 
-          ylab("Dispersion") + 
-          xlab("BaseMean") +
-          scale_colour_manual(
-            values=c("Black", "#377eb8", "Red"), 
-            breaks=c("dispGeneEst", "dispersion", "dispFit"), 
-            labels=c("Estimate", "Final", "Fit"),
-            name=""
-          ) +
-          guides(colour = guide_legend(override.aes = list(size=2))) +
-          theme_prism(base_size = 30) +
-          theme(legend.key.height = unit(30, "pt"),
-                legend.title = element_text(size=25),
-                legend.text = element_text(size=25)) +
-          labs(title = "DESeq2 dispersion"))
-  dev.off()
-  
-  #  use <- res$baseMean > metadata(res)$filterThreshold
-  #  h1 <- hist(res$pvalue[!use], breaks=0:50/50, plot=FALSE)
-  #  h2 <- hist(res$pvalue[use], breaks=0:50/50, plot=FALSE)
-  #  colori <- c(`do not pass`="khaki", `pass`="powderblue")
-  #  png(file=paste0('output/', n, '/training/figures/differential expression/pass.png'), width=1920, height=1020)
-  #  barplot(height = rbind(h1$counts, h2$counts), beside = FALSE,
-  #          col = colori, space = 0, main = "", ylab="frequency", cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #  text(x = c(0, length(h1$counts)), y = 0, label = paste(c(0,1)),
-  #       adj = c(0.5,1.7), xpd=NA)
-  #  legend("topright", fill=rev(colori), legend=rev(names(colori)))
-  #  dev.off()
-  
-  #######################################
-  #######          GSEA           #######
-  #######################################
-  dir.create(paste0('output/', n, '/training/figures/GO'))
-  dir.create(paste0('output/', n, '/training/output/GO'))
-  
-  geneList.training <- d.training.summary[,1]
-  names(geneList.training) <- rownames(d.training.summary)
-  geneList.training <- sort(geneList.training, decreasing = TRUE)
-  write.table(names(geneList.training), file=paste0('output/', n, '/training/output/differential expression/DE_genes.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  rows <- names(geneList.training)
-  try({rows[substr(rows,1,3) == "LOC"] <- mapIds(org.Hs.eg.db, keys = gsub('LOC', '', rows[substr(rows,1,3) == "LOC"]), column = "SYMBOL", keytype="ENTREZID")}, silent=TRUE)
-  try({rows[which(is.na(mapIds(org.Hs.eg.db, keys = rows, column = "ENTREZID", keytype="SYMBOL")))] <- mapIds(org.Hs.eg.db, keys = rows[which(is.na(mapIds(org.Hs.eg.db, keys = rows, column = "ENTREZID", keytype="SYMBOL")))],     column = "SYMBOL", keytype="ALIAS")}, silent=TRUE)
-  rows[which(rows == "LOC101929759")] <- "SLCO5A1-AS1"
-  rows[which(rows == "LOC107984285")] <- "LARP4B"
-  rows[which(rows == "UNQ6494")] <- "LINC03062"
-  rows[which(rows == "FLJ22447")] <- "LINC03033"
-  rows[which(rows == "FLJ37453")] <- "SPEN-AS1"
-  rows[which(rows == "MPP6")] <- "PALS2"
-  rows[which(rows == "TIAF1")] <- "MYO18A"
-  rows[which(rows == "H4-16")] <- "H4C16"
-  rows[which(rows == "CBWD3")] <- "ZNG1C"
-  rows[which(rows == "LCA10")] <- "L1CAM-AS1"  
-  names(geneList.training) <- mapIds(org.Hs.eg.db, keys = rows, column = "ENTREZID", keytype = "SYMBOL")
-  
-  gsea.training.BP <- gseGO(geneList     = geneList.training,
+  for (dataset in c("exploration","validation")){
+    
+    dir.create(paste0('output/', n, '/', dataset))
+    dir.create(paste0('output/', n, '/', dataset, '/output'))
+    dir.create(paste0('output/', n, '/', dataset, '/figures'))
+    dir.create(paste0('output/', n, '/', dataset, '/rdata'))
+    
+    selection <- c("")
+    
+    if (dataset == "exploration"){
+      selection <- sample(colnames(d.raw), floor(ncol(d.raw)/2))
+      selection <- sort(selection)
+      save(selection, file=paste0('output/' , n, '/exploration/rdata/sampleSelection.RData'))
+    } else {
+      load(file=paste0('output/' , n, '/exploration/rdata/sampleSelection.RData'))
+      selection <- colnames(d.raw)[!(colnames(d.raw) %in% selection)]
+      selection <- sort(selection)
+      save(selection, file=paste0('output/', n, '/validation/rdata/sampleSelection.RData'))
+    }
+    
+    d.subset <- d.raw[,selection] 
+    d.subset.adj <- d.adj[, selection]
+    group.data.subset <- group.data[selection,]
+    
+    samples.subset <- colnames(d.subset)
+    ids.subset <- rownames(d.subset)
+    groups.subset <- group.data.subset[,hit]
+    colnames(d.subset) <- samples.subset
+    
+    group.subset <- as.matrix(group.data.subset[,hit])
+    rownames(group.subset) <- rownames(group.data.subset)
+    colnames(group.subset) <- c(hit)
+    
+    ### DIAGNOSTIC PLOTS
+    #  d.subset.cs <- d.cs[,selection]
+    #  d.subset.cs.WT <- d.subset.cs[,rownames(group.data.subset[group.data.subset[,hit] == "WT",])]
+    #  d.subset.cs.SNV <- d.subset.cs[,rownames(group.data.subset[group.data.subset[,hit] == "SNV",])]
+    #  
+    #  png(file=paste0('output/', n, '/', dataset, '/figures/heatmapSNVSubset.png'), width=1920, height=1020)
+    #    pheatmap(d.subset.cs.SNV,
+    #             legend=TRUE,
+    #             color=my_palette,
+    #             breaks=colors,
+    #             show_rownames=FALSE,
+    #             show_colnames=FALSE
+    #    )
+    #  dev.off()
+    #  
+    #  png(file=paste0('output/', n, '/', dataset, '/figures/heatmapWTSubset.png'), width=1920, height=1020)
+    #    pheatmap(d.subset.cs.WT,
+    #             legend=TRUE,
+    #             color=my_palette,
+    #             breaks=colors,
+    #             show_rownames=FALSE,
+    #             show_colnames=FALSE
+    #    )
+    #  dev.off()   
+    #
+    #  png(file=paste0('output/', n, '/', dataset, '/figures/heatmap.png'), width=1920, height=1020)
+    #    pheatmap(d.subset.cs, color=my_palette, cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, show_colnames = FALSE, annotation_col=as.data.frame(group.subset), cex.lab = 2, cex.axis = 2, cex.main = 2)
+    #  dev.off()
+    
+    colnames(d.subset) <- group.subset
+    
+    #  png(file=paste0('output/', n, '/', dataset, '/figures/sampleCluster.png'), width=1920, height=1020)
+    #    plotClusterTreeSamples(t(d.subset), as.numeric(factor(groups.subset)), cex.lab = 2, cex.axis = 2, cex.main = 2)
+    #  dev.off()
+    #  
+    #  sampleDists <- dist(t(d.subset))
+    #  sampleDistMatrix <- as.matrix(sampleDists)
+    #  rownames(sampleDistMatrix) <- colnames(d.subset)
+    #  colnames(sampleDistMatrix) <- colnames(d.subset)
+    #  png(file=paste0('output/', n, '/', dataset, '/figures/sampleDistances.png'), width=1920, height=1020)
+    #    pheatmap(sampleDistMatrix,
+    #             clustering_distance_rows=sampleDists,
+    #             clustering_distance_cols=sampleDists,
+    #             col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
+    #  dev.off()
+    #  
+    #  geneDists <- dist(d.subset)
+    #  geneDistMatrix <- as.matrix(geneDists)
+    #  rownames(geneDistMatrix) <- rownames(d.subset)
+    #  colnames(geneDistMatrix) <- rownames(d.subset)
+    #  png(file=paste0('output/', n, '/', dataset, '/figures/geneDistances.png'), width=1920, height=1020)
+    #    pheatmap(geneDistMatrix,
+    #             clustering_distance_rows=geneDists,
+    #             clustering_distance_cols=geneDists,
+    #             col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
+    #  dev.off()
+    #
+    #  png(file=paste0('output/', n, '/', dataset, '/figures/meanExpressionSelection.png'), width=1920, height=1020)
+    #  barplot(apply(t(d.subset),1,mean, na.rm=T),
+    #          xlab = "Sample", ylab = "Mean expression",
+    #          main ="Mean expression across samples", cex.lab = 2, cex.axis = 2, cex.main = 2)
+    #  dev.off()
+    #  
+    #  png(file=paste0('output/', n, '/', dataset, '/figures/heatmapVST.png'), width=1920, height=1020)
+    #    pheatmap(d.subset.adj, color=my_palette, cluster_rows=TRUE, show_colnames=FALSE, cluster_cols=TRUE, show_rownames = FALSE, annotation_col=as.data.frame(group.subset))
+    #  dev.off()
+    
+    colnames(d.subset) <- group.subset
+    
+    #  png(file=paste0('output/', n, '/', dataset, '/figures/sampleClusterVST.png'), width=1920, height=1020)
+    #    plotClusterTreeSamples(t(d.subset.adj), as.numeric(factor(groups.subset)), cex.lab = 2, cex.axis = 2, cex.main = 2)
+    #  dev.off()
+    #  
+    #  sampleDists.adj <- dist(t(d.subset.adj))
+    #  sampleDistMatrix.adj <- as.matrix(sampleDists.adj)
+    #  rownames(sampleDistMatrix.adj) <- colnames(d.subset.adj)
+    #  colnames(sampleDistMatrix.adj) <- colnames(d.subset.adj)
+    #  png(file=paste0('output/', n, '/', dataset, '/figures/sampleDistancesVST.png'), width=1920, height=1020)
+    #    pheatmap(sampleDistMatrix.adj,
+    #             clustering_distance_rows=sampleDists.adj,
+    #             clustering_distance_cols=sampleDists.adj,
+    #             col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
+    #  dev.off()
+    #  
+    #  geneDists.adj <- dist(d.subset.adj)
+    #  geneDistMatrix.adj <- as.matrix(geneDists.adj)
+    #  rownames(geneDistMatrix.adj) <- rownames(d.subset.adj)
+    #  colnames(geneDistMatrix.adj) <- rownames(d.subset.adj)
+    #  png(file=paste0('output/', n, '/', dataset, '/figures/geneDistancesVST.png'), width=1920, height=1020)
+    #    pheatmap(geneDistMatrix.adj,
+    #             clustering_distance_rows=geneDists.adj,
+    #             clustering_distance_cols=geneDists.adj,
+    #             col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
+    #  dev.off()
+    #
+    
+    ### Save input data
+    save(d.subset, d.subset.adj, group.data.subset, group.subset, file=(paste0('output/', n, '/', dataset, '/rdata/input_data.RData')))
+    
+    #######################################
+    #######         DESeq2           ######
+    #######################################
+    dir.create(paste0('output/', n, '/', dataset, '/figures/differential expression'))
+    dir.create(paste0('output/', n, '/', dataset, '/output/differential expression'))
+    
+    time1 <- Sys.time()
+    colnames(d.subset) <- samples.subset
+    group.subset[,1] <- factor(group.subset[,1], levels = c("WT","SNV"))
+    dds <- DESeqDataSetFromMatrix(countData = d.subset, colData = group.subset, design = formula(paste("~",hit)))
+    dds
+    dds <- DESeq(dds)
+    res <- results(dds)
+    res
+    summary(res)
+    
+    colnames(d.subset) <- groups.subset
+    
+    d.subset.summary <- data.frame(unlist(res$log2FoldChange), unlist(res$padj), row.names = rownames(res))
+    colnames(d.subset.summary) <- c("log2FC", "Pvalue")
+    d.subset.summary <- na.omit(d.subset.summary)
+    d.subset.adj <- d.subset.adj[rownames(d.subset.adj) %in% rownames(d.subset.summary),]
+    ids.subset <- rownames(d.subset.adj)
+    
+    time2<- Sys.time()
+    print(paste("DESeq2:", difftime(time2, time1, units="secs")))
+    
+    write.table(d.subset.summary[,"log2FC", drop = FALSE], file=paste0('output/', n, '/', dataset, '/output/differential expression/DE_LFC.tsv'), row.names=TRUE, col.names=TRUE, sep='\t')
+    
+    ###DESEQ PLOTS
+    d.subset.summary2 <- d.subset.summary %>% 
+      mutate(
+        Expression = case_when(log2FC >= 0.1 & Pvalue <= 0.1 ~ "Up-regulated",
+                               log2FC <= -0.1 & Pvalue <= 0.1 ~ "Down-regulated",
+                               TRUE ~ "Unchanged")
+      ) %>%
+      arrange(desc(log2FC))
+    
+    d.subset.summary2 <- cbind(gene=rownames(d.subset.summary2), d.subset.summary2)
+    
+    png(file=paste0('output/', n, '/', dataset, '/figures/differential expression/volcano.png'), width=1920, height=1020)
+    print(ggplot(d.subset.summary2, aes(log2FC, -log(Pvalue,10))) +
+            geom_point(aes(color = Expression), size = 2) +
+            xlab(expression("log"[2]*"FC")) + 
+            ylab(expression("-log"[10]*"adjusted p-value")) +
+            scale_color_manual(values = c("Up-regulated" = "red", "Down-regulated" = "blue", "Unchanged" = "grey")) +
+            scale_x_continuous(
+              limits = c(-4, 4),
+              breaks = seq(-4, 4, by = 0.5),
+              guide = "prism_minor") +
+            scale_y_continuous(
+              limits = c(0, 15),
+              breaks = seq(0, 15, by = 3)) +
+            geom_label_repel(data=head(filter(d.subset.summary2, Pvalue<=0.1),10), aes(label=gene,fontface='bold',segment.size=1), box.padding = 0.5, size=6, xlim  = c(3,4), min.segment.length = 0) +
+            geom_label_repel(data=tail(filter(d.subset.summary2, Pvalue<=0.1),10), aes(label=gene,fontface='bold',segment.size=1), box.padding = 0.5, size=6, xlim  = c(-4,-3), min.segment.length = 0) +
+            guides(colour = guide_legend(override.aes = list(size=3))) +
+            theme_prism(border=TRUE,base_size = 25) +
+            theme(legend.key.height = unit(30, "pt"),
+                  legend.title = element_text(size=25),
+                  legend.text = element_text(size=25),
+                  legend.margin = margin(0, 30, 0, 0)) +
+            labs(title = "DESeq2 log-fold changes and p-values"))
+    dev.off()
+    
+    dds2 <- as.data.frame(mcols(dds)) %>% 
+      select(baseMean, dispGeneEst, dispFit, dispersion) %>% 
+      melt(id.vars="baseMean") %>% 
+      filter(baseMean>0) %>%
+      arrange(factor(variable, levels=c("dispGeneEst","dispersion","dispFit")))
+    
+    png(file=paste0('output/', n, '/', dataset, '/figures/differential expression/dispersion.png'), width=1920, height=1020)
+    print(ggplot(dds2, aes(x=baseMean, y=value, colour=variable)) + 
+            geom_point(size=1.5) +
+            scale_x_log10() + 
+            scale_y_log10() + 
+            theme_bw() + 
+            ylab("Dispersion") + 
+            xlab("BaseMean") +
+            scale_colour_manual(
+              values=c("Black", "#377eb8", "Red"), 
+              breaks=c("dispGeneEst", "dispersion", "dispFit"), 
+              labels=c("Estimate", "Final", "Fit"),
+              name=""
+            ) +
+            guides(colour = guide_legend(override.aes = list(size=2))) +
+            theme_prism(base_size = 30) +
+            theme(legend.key.height = unit(30, "pt"),
+                  legend.title = element_text(size=25),
+                  legend.text = element_text(size=25)) +
+            labs(title = "DESeq2 dispersion"))
+    dev.off()
+    
+    #  use <- res$baseMean > metadata(res)$filterThreshold
+    #  h1 <- hist(res$pvalue[!use], breaks=0:50/50, plot=FALSE)
+    #  h2 <- hist(res$pvalue[use], breaks=0:50/50, plot=FALSE)
+    #  colori <- c(`do not pass`="khaki", `pass`="powderblue")
+    #  png(file=paste0('output/', n, '/', dataset, '/figures/differential expression/pass.png'), width=1920, height=1020)
+    #  barplot(height = rbind(h1$counts, h2$counts), beside = FALSE,
+    #          col = colori, space = 0, main = "", ylab="frequency", cex.lab = 2, cex.axis = 2, cex.main = 2)
+    #  text(x = c(0, length(h1$counts)), y = 0, label = paste(c(0,1)),
+    #       adj = c(0.5,1.7), xpd=NA)
+    #  legend("topright", fill=rev(colori), legend=rev(names(colori)))
+    #  dev.off()
+    
+    #######################################
+    #######          GSEA           #######
+    #######################################
+    dir.create(paste0('output/', n, '/', dataset, '/figures/GO'))
+    dir.create(paste0('output/', n, '/', dataset, '/output/GO'))
+    
+    geneList.subset <- d.subset.summary[,1]
+    names(geneList.subset) <- rownames(d.subset.summary)
+    geneList.subset <- sort(geneList.subset, decreasing = TRUE)
+    write.table(names(geneList.subset), file=paste0('output/', n, '/', dataset, '/output/differential expression/DE_genes.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
+    rows <- names(geneList.subset)
+    try({rows[substr(rows,1,3) == "LOC"] <- mapIds(org.Hs.eg.db, keys = gsub('LOC', '', rows[substr(rows,1,3) == "LOC"]), column = "SYMBOL", keytype="ENTREZID")}, silent=TRUE)
+    try({rows[which(is.na(mapIds(org.Hs.eg.db, keys = rows, column = "ENTREZID", keytype="SYMBOL")))] <- mapIds(org.Hs.eg.db, keys = rows[which(is.na(mapIds(org.Hs.eg.db, keys = rows, column = "ENTREZID", keytype="SYMBOL")))],     column = "SYMBOL", keytype="ALIAS")}, silent=TRUE)  
+    rows[which(rows == "LOC101929759")] <- "SLCO5A1-AS1"
+    rows[which(rows == "LOC107984285")] <- "LARP4B"
+    rows[which(rows == "UNQ6494")] <- "LINC03062"
+    rows[which(rows == "FLJ22447")] <- "LINC03033"
+    rows[which(rows == "FLJ37453")] <- "SPEN-AS1"
+    rows[which(rows == "MPP6")] <- "PALS2"
+    rows[which(rows == "TIAF1")] <- "MYO18A"
+    rows[which(rows == "H4-16")] <- "H4C16"
+    rows[which(rows == "CBWD3")] <- "ZNG1C"
+    rows[which(rows == "LCA10")] <- "L1CAM-AS1"  
+    names(geneList.subset) <- mapIds(org.Hs.eg.db, keys = rows, column = "ENTREZID", keytype = "SYMBOL")
+    
+    gsea.subset.BP <- gseGO(geneList     = geneList.subset,
                             OrgDb        = org.Hs.eg.db,
                             ont          = "BP",
                             pvalueCutoff = 0.1,
                             eps=0)
-  
-  gsea.training.MF <- gseGO(geneList     = geneList.training,
+    
+    gsea.subset.MF <- gseGO(geneList     = geneList.subset,
                             OrgDb        = org.Hs.eg.db,
                             ont          = "MF",
                             pvalueCutoff = 0.1,
                             eps=0)
-  
-  
-  #gsea.training.KEGG <- GSEA(geneList.training, pvalueCutoff = 0.1, TERM2GENE = msigdbr(species = "Homo sapiens", category = "C2", subcategory="KEGG") %>% 
-  #dplyr::select(gs_name, entrez_gene))
-  
-  
-  top_BP <- head(gsea.training.BP@result[order(gsea.training.BP@result$p.adjust), ], 5)
-  top_MF <- head(gsea.training.MF@result[order(gsea.training.MF@result$p.adjust), ], 5)
-  #top_KEGG <- head(gsea.training.KEGG[order(gsea.training.KEGG@result$p.adjust), ], 5)
-  
-  top_BP <- top_BP %>% mutate(Description = paste("GO:BP", Description))
-  top_MF <- top_MF %>% mutate(Description = paste("GO:MF", Description))
-  #top_KEGG <- top_KEGG %>% mutate(Description = paste("KEGG", Description))
-  
-  #top <- rbind(top_BP,top_MF,top_KEGG)
-  top <- rbind(top_BP,top_MF)
-  top <- top[order(top$p.adjust), ]
-  
-  png(file=paste0('output/', n, '/training/figures/GO/GSEA.png'), width=1920, height=1020)
-  print(ggplot(top, aes(x = NES, y = reorder(Description, -p.adjust), fill = p.adjust)) +
-          geom_bar(stat = "identity") +
-          scale_fill_gradient(low = "red", high = "blue") +
-          labs(title = "Gene Ontology Enrichment Analysis",
-               x = "NES",
-               fill = "Adjusted p-value",
-               y="") +
-          scale_y_discrete(labels = function(x) str_wrap(x, width = 60)) +
-          theme_prism(base_size = 28) +
-          theme(plot.title = element_text(hjust = 0.75)) +
-          theme(legend.text = element_text(size=24),
-                legend.title = element_text(size=26)))
-  dev.off()
-  
-  write.table(rownames(gsea.training.BP@result[gsea.training.BP@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/training/output/GO/GSEA_BP.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  write.table(rownames(gsea.training.MF@result[gsea.training.MF@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/training/output/GO/GSEA_MF.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  #write.table(rownames(gsea.training.KEGG@result[gsea.training.KEGG@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/training/output/GO/GSEA_KEGG.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  write.table(names(geneList.training), file=paste0('output/', n, '/training/output/differential expression/DE_genes.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  
-  save(geneList.training, d.training.summary, dds, top, file=paste0('output/', n, '/training/rdata/DE_data.RData'))
-  
-  #######################################
-  ######           WGCNA           ######
-  #######################################
-  dir.create(paste0('output/', n, '/training/figures/coexpression'))
-  dir.create(paste0('output/', n, '/training/output/coexpression'))
-  
-  time1 <- Sys.time()
-  d.training.log2vals <- as.data.frame(d.training.summary[, c('log2FC')], row.names=row.names(d.training.summary))
-  colnames(d.training.log2vals) <- c('log2FC')
-  coexpression <- coexpression.analysis(t(d.training.adj), d.training.log2vals, paste0('output/', n, '/training/output/coexpression'), paste0('output/', n, '/training/figures/coexpression'), n, 'training')
-  wgcna.net <- coexpression[[1]]
-  module.significance <- coexpression[[2]]
-  power <- coexpression[[3]]
-  time2 <- Sys.time()
-  print(paste("WGCNA:", difftime(time2, time1, units="secs")))
-  moduleColors <- labels2colors(wgcna.net$colors)
-  modules <- levels(as.factor(moduleColors))
-  write.table(modules, file=paste0('output/', n, '/training/output/coexpression/modules.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  
-  ids <- ids[moduleColors != "grey"]
-  log2vals <- d.training.summary[ids, "log2FC"]
-  pvals <- d.training.summary[ids, "Pvalue"]
-  names(log2vals) <- ids
-  names(pvals) <- ids
-  
-  ### PLOTS
-  TOM <- TOMsimilarityFromExpr(t(d.training.adj[ids,]), power=power, TOMType="unsigned")
-  diss2 <- 1-TOM
-  hier2 <- hclust(as.dist(diss2), method="average")
-  colorDynamicTOM <- labels2colors(cutreeDynamic(hier2,method="tree"))
-  diag(diss2) = NA;
-  moduleColors2 <- moduleColors[moduleColors != "grey"]
-  
-  datME <- moduleEigengenes(t(d.training.adj[ids,]),colorDynamicTOM)$eigengenes
-  dissimME <- (1-t(cor(datME, use="p")))/2
-  hclustdatME <- hclust(as.dist(dissimME), method="average")
-  par(mfrow=c(1,1))
-  png(file=paste0('output/', n, '/training/figures/coexpression/moduleEigengenes.png'), width=1920, height=1020)
-  plot(hclustdatME, main="Clustering tree based of the module eigengenes", cex.lab = 2, cex.axis = 2, cex.main = 2)
-  dev.off()
-  
-  #  GS1 <- as.numeric(cor(group,t(d.training.adj[ids,])))
-  #  GeneSignificance <- abs(GS1)
-  #  ModuleSignificance <- tapply(GeneSignificance, colorDynamicTOM, mean, na.rm=T)
-  #  png(file=paste0('output/', n, '/training/figures/coexpression/moduleSignificance2.png'), width=1920, height=1020)
-  #    plotModuleSignificance(GeneSignificance,colorDynamicTOM, cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #  dev.off()
-  #
-  #  MEs <- orderMEs(datME)
-  #  modNames <- substring(names(MEs), 3)
-  #  geneModuleMembership <- as.data.frame(cor(t(d.training.adj[ids,]), MEs, use = "p"));
-  #  names(geneModuleMembership) <- paste0("MM", modNames);
-  #  GS1 <- as.data.frame(GS1)
-  #  names(GS1) = paste0("GS.", names(groups))
-  
-  disableWGCNAThreads()
-  
-  save(hclustdatME, file=(paste0('output/', n, '/training/rdata/coexpression_data.RData')))
-  
-  ########################################
-  ######     Hierarchical HotNet    ######
-  ########################################
-  dir.create(paste0('output/', n, '/training/figures/hotnet'))
-  dir.create(paste0('output/', n, '/training/output/hotnet'))
-  dir.create(paste0('output/', n, '/training/output/hotnet/HotNet_input'))
-  
-  corPVal <- corAndPvalue(t(d.training.adj[ids,]), use="pairwise.complete.obs")
-  
-  cutOff <- 0.5
-  print(paste("Cut off:", cutOff))
-  
-  hotnetColors <- c()
-  
-  for (module in modules){
-    if (module == "grey"){
-      next
-    } 
-    else {
-      print(module)
-      inModule <- moduleColors2 == module
-      sum(inModule)
-      TOMmodule <- TOM[inModule, inModule]
-      corModule <- corPVal[["cor"]][inModule, inModule]
-      idsModule <- ids[inModule]
-      write.table(idsModule, file=paste0('output/', n, '/training/output/coexpression/', module, '.tsv'), sep='\t', row.names=FALSE, col.names=FALSE)
-      log2Module <- log2vals[inModule]
-      PModule <- pvals[inModule]
-      
-      node.frame <- data.frame(Symbol=idsModule, LogFC=abs(log2Module), Pvalue=PModule)
-      rownames(node.frame) <- 1:nrow(node.frame)
-      #node.frame$InvPvalue <- 1 - PModuleProteins
-      # write.table(node.frame[, c('Symbol', 'InvPvalue')], file=paste0('output/', n, '/training/output/hotnet/HotNet_input/g2s_Pval_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-      names(idsModule) <- idsModule
-      
-      write.table(node.frame[, c('Symbol', 'LogFC')], file=paste0('output/', n, '/training/output/hotnet/HotNet_input/g2s_log2_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-      
-      time1 <- Sys.time()
-      combine <- function(x,y){
-        w1 <- rbind(x[[1]], y[[1]])
-        x1 <- rbind(x[[2]], y[[2]])
-        y1 <- rbind(x[[3]], y[[3]])
-        z1 <- rbind(x[[4]], y[[4]])
-        y1 <- y1[!duplicated(y1), ]
-        z1 <- z1[!duplicated(z1), ]
-        return(list(w1,x1,y1,z1))
-      }
-      
-      result <- foreach(i = 1:(nrow(TOMmodule)-1), .combine = 'combine', .inorder = TRUE) %dopar% {
-        result1 <- data.frame(matrix(nrow=0,ncol=2))
-        result2 <- data.frame(matrix(nrow=0,ncol=2))
-        result3 <- data.frame(matrix(nrow=0,ncol=2))
-        result4 <- data.frame(matrix(nrow=0,ncol=2))
-        for (j in (i+1):nrow(TOMmodule)){
-          if (corModule[i,j] >= 0.5 || corModule[i,j] <= -0.5){
-            result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
-            result2[nrow(result2)+1,] <- c(i,j)
-            if (!i %in% result3[,1]){
-              result3[nrow(result3)+1,] <- c(i, idsModule[i])
-              result4[nrow(result4)+1,] <- c(idsModule[i], abs(log2Module[i]))
-            } 
-            if (!j %in% result3[,1]){
-              result3[nrow(result3)+1,] <- c(j, idsModule[j])
-              result4[nrow(result4)+1,] <- c(idsModule[j], abs(log2Module[j]))
-            }
-          }
-        }
-        return(list(result1, result2, result3, result4))
-      }
-      time2 <- Sys.time()
-      print(paste("Slicing input:", difftime(time2, time1, units="secs")))
-      time1 <- Sys.time()
-      write.table(result[[1]], file=paste0('output/', n, '/training/output/hotnet/HotNet_input/name_edges_expression_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-      write.table(result[[2]], file=paste0('output/', n, '/training/output/hotnet/HotNet_input/edge_list_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-      write.table(result[[3]], file=paste0('output/', n, '/training/output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-      write.table(result[[4]], file=paste0('output/', n, '/training/output/hotnet/HotNet_input/g2s_log2', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-      time2 <- Sys.time()
-      print(paste("Writing data:", difftime(time2, time1, units="secs")))
-      if (file.info(paste0('output/', n, '/training/output/hotnet/HotNet_input/i2g_', module, '.tsv'))$size != 0){
-        hotnetColors <- append(hotnetColors, module)
-      }
-    }
     
-    idsModule2 <- idsModule
     
-    try({idsModule2[substr(idsModule2,1,3) == "LOC"] <- mapIds(org.Hs.eg.db, keys = gsub('LOC', '', idsModule2[substr(idsModule2,1,3) == "LOC"]), column = "SYMBOL", keytype="ENTREZID")}, silent=TRUE)
-    
-    try({idsModule2[which(is.na(mapIds(org.Hs.eg.db, keys = idsModule2, column = "ENTREZID", keytype="SYMBOL")))] <- mapIds(org.Hs.eg.db, keys = idsModule2[which(is.na(mapIds(org.Hs.eg.db, keys = idsModule2, column = "ENTREZID", keytype="SYMBOL")))], column = "SYMBOL", keytype="ALIAS")}, silent=TRUE)
-    
-    idsModule2[which(idsModule2 == "LOC101929759")] <- "SLCO5A1-AS1"
-    idsModule2[which(idsModule2 == "LOC107984285")] <- "LARP4B"
-    idsModule2[which(idsModule2 == "UNQ6494")] <- "LINC03062"
-    idsModule2[which(idsModule2 == "FLJ22447")] <- "LINC03033"
-    idsModule2[which(idsModule2 == "FLJ37453")] <- "SPEN-AS1"
-    idsModule2[which(idsModule2 == "MPP6")] <- "PALS2"
-    idsModule2[which(idsModule2 == "TIAF1")] <- "MYO18A"
-    idsModule2[which(idsModule2 == "H4-16")] <- "H4C16"
-    idsModule2[which(idsModule2 == "CBWD3")] <- "ZNG1C"
-    idsModule2[which(idsModule2 == "LCA10")] <- "L1CAM-AS1"  
-    
-    geneNames <- c()
-    try({geneNames <- mapIds(org.Hs.eg.db, keys = idsModule2, column = "ENTREZID", keytype = "SYMBOL")}, silent=TRUE)
-    
-    if (is.null(geneNames)){next}
-    
-    goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
-    goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
-    #goKEGG <- enricher(geneNames, pvalueCutoff = 0.1, TERM2GENE = msigdbr(species = "Homo sapiens", category = "C2", subcategory="KEGG") %>% 
+    #gsea.subset.KEGG <- GSEA(geneList.subset, pvalueCutoff = 0.1, TERM2GENE = msigdbr(species = "Homo sapiens", category = "C2", subcategory="KEGG") %>% 
     #dplyr::select(gs_name, entrez_gene))
     
-    top_BP <- data.frame()
-    if (!is.null(goBP)){
-      top_BP <- head(goBP@result[order(goBP@result$p.adjust), ], 5)
-      top_BP <- top_BP %>% mutate(Description = paste("GO:BP", Description))  
-    }
-    top_MF <- data.frame()
-    if (!is.null(goMF)){
-      top_MF <- head(goMF@result[order(goMF@result$p.adjust), ], 5)
-      top_MF <- top_MF %>% mutate(Description = paste("GO:MF", Description))        
-    }
-    #      top_KEGG <- data.frame()
-    #      if (!is.null(goKEGG)){
-    #        top_KEGG <- head(goKEGG@result[order(goKEGG@result$p.adjust), ], 5)
-    #        top_KEGG <- top_KEGG %>% mutate(Description = paste("KEGG", Description))        
-    #      }
+    
+    top_BP <- head(gsea.subset.BP@result[order(gsea.subset.BP@result$p.adjust), ], 5)
+    top_MF <- head(gsea.subset.MF@result[order(gsea.subset.MF@result$p.adjust), ], 5)
+    #top_KEGG <- head(gsea.subset.KEGG[order(gsea.subset.KEGG@result$p.adjust), ], 5)
+    
+    top_BP <- top_BP %>% mutate(Description = paste("GO:BP", Description))
+    top_MF <- top_MF %>% mutate(Description = paste("GO:MF", Description))
+    #top_KEGG <- top_KEGG %>% mutate(Description = paste("KEGG", Description))
     
     #top <- rbind(top_BP,top_MF,top_KEGG)
     top <- rbind(top_BP,top_MF)
+    top <- top[order(top$p.adjust), ]
     
-    if (nrow(top) > 0){
-      top <- top[order(top$p.adjust), ]   
-      png(file=paste0('output/', n, '/training/figures/coexpression/GO_', module, '.png'), width=1920, height=1020)
-      print(ggplot(top, aes(x = Count, y = reorder(Description, -p.adjust), fill = p.adjust)) +
-              geom_bar(stat = "identity") +
-              scale_fill_gradient(low = "red", high = "blue") +
-              labs(title = "Gene Ontology Enrichment Analysis",
-                   x = "Count",
-                   fill = "Adjusted p-value",
-                   y="") +
-              scale_y_discrete(labels = function(x) str_wrap(x, width = 60)) +
-              theme_prism(base_size = 28) +
-              theme(plot.title = element_text(hjust = 0.75)) +
-              theme(legend.text = element_text(size=24),
-                    legend.title = element_text(size=26)))
-      dev.off()
-    }
+    png(file=paste0('output/', n, '/', dataset, '/figures/GO/GSEA.png'), width=1920, height=1020)
+    print(ggplot(top, aes(x = NES, y = reorder(Description, -p.adjust), fill = p.adjust)) +
+            geom_bar(stat = "identity") +
+            scale_fill_gradient(low = "red", high = "blue") +
+            labs(title = "Gene Ontology Enrichment Analysis",
+                 x = "NES",
+                 fill = "Adjusted p-value",
+                 y="") +
+            scale_y_discrete(labels = function(x) str_wrap(x, width = 60)) +
+            theme_prism(base_size = 28) +
+            theme(plot.title = element_text(hjust = 0.75)) +
+            theme(legend.text = element_text(size=24),
+                  legend.title = element_text(size=26)))
+    dev.off()
     
-    write.table(goBP@result[goBP@result$p.adjust <= 0.1,], file=paste0('output/', n, '/training/output/coexpression/', module, 'BP.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
-    write.table(goMF@result[goMF@result$p.adjust <= 0.1,], file=paste0('output/', n, '/training/output/coexpression/', module, 'MF.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
-    #   write.table(goKEGG@result[goKEGG@result$p.adjust <= 0.1,], file=paste0('output/', n, '/training/output/coexpression/', module, 'KEGG.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
-    write.table(top, file=paste0('output/', n, '/training/output/coexpression/GO_', module, '.tsv'), row.names=TRUE, col.names=TRUE, sep='\t')
+    write.table(rownames(gsea.subset.BP@result[gsea.subset.BP@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/', dataset, '/output/GO/GSEA_BP.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
+    write.table(rownames(gsea.subset.MF@result[gsea.subset.MF@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/', dataset, '/output/GO/GSEA_MF.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
+    #write.table(rownames(gsea.subset.KEGG@result[gsea.subset.KEGG@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/', dataset, '/output/GO/GSEA_KEGG.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
+    write.table(names(geneList.subset), file=paste0('output/', n, '/', dataset, '/output/differential expression/DE_genes.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
     
-    #    
-    #      par(mar = c(1, 1, 1, 1))
-    #      png(file=paste0('output/', n, '/training/figures/coexpression/', module, '_matrix.png'), width=1920, height=1020)
-    #        plotMat(t(scale(t(d.training.adj[colorDynamicTOM==module,]))),rlabels=T,
-    #                clabels=T,rcols=module,
-    #                title=module, cex.lab = 2, cex.axis = 2, cex.main = 2)
-    #      dev.off()
-    #      
-    #      ME=datME[, paste0("ME",module)]
-    #      par(mar = c(2, 1, 1, 1))
-    #      png(file=paste0('output/', n, '/training/figures/coexpression/', module, '_ME.png'), width=1920, height=1020)
-    #      barplot(ME, col=module, main="", cex.main=2,
-    #              ylab="eigengene expression",xlab="array sample", cex.lab = 2, cex.axis = 2, cex.main = 2)
-    #      dev.off()
-    #      
-    #      par(mfrow = c(1,1));
-    #      column <- match(module, modNames);
-    #      png(file=paste0('output/', n, '/training/figures/coexpression/', module, '_membershipVSsignficance.png'), width=1920, height=1020)
-    #        verboseScatterplot(abs(geneModuleMembership[inModule, column]),
-    #                           abs(GS1[inModule, 1]),
-    #                           xlab = paste("Module Membership in", module, "module"),
-    #                           ylab = "Gene significance",
-    #                           main = paste("Module membership vs. gene significance\n"),
-    #                           cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
-    #      dev.off()
-    #      
-    #      }
-  }
-  
-  time1 <- Sys.time()
-  system(paste('bash', paste(argv[1],'/src/run_hierarchicalHotnet_modules.sh "', sep=""), paste(hotnetColors, collapse=' '), '" ', cutOff, n, 'training'))
-  time2 <- Sys.time()
-  print(paste("Hierarchical HotNet:", difftime(time2, time1, units="secs")))
-  
-  time1 <- Sys.time()
-  
-  BPterms <- c()
-  MFterms <- c()
-  genes <- c()
-  subnetworks <- c()
-  hotnetSubnetworks <- c()
-  
-  for (module in hotnetColors){
-    if (file.exists(file=paste0('output/', n, '/training/output/hotnet/HotNet_results/clusters_hierarchies_log2_', module, '.tsv'))){
-      p <- read.table(file=paste0('output/', n, '/training/output/hotnet/HotNet_results/clusters_hierarchies_log2_', module, '.tsv'), sep='\t', header= FALSE, comment.char="")[6, "V1"]
-      p <- as.numeric(sub(".*: ", "", p))
-      if (file.exists(paste0('output/', n, '/training/output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv')) &&
-          file.info(paste0('output/', n, '/training/output/hotnet//HotNet_results/consensus_nodes_log2_', module, '.tsv'))$size == 0){
-        next
-      }
-      if (!(module %in% hotnetSubnetworks)){hotnetSubnetworks <- append(hotnetSubnetworks, module)}
-      if (p <= 0.1){
-        print(module)
-        if (!(module %in% subnetworks)){subnetworks <- append(subnetworks, module)}
-        nodes <- read.csv(paste0('output/', n, '/training/output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv'), sep='\t', header = FALSE)
-        edges <- read.csv(paste0('output/', n, '/training/output/hotnet/HotNet_results/consensus_edges_log2_', module, '.tsv'), sep='\t', header = FALSE)
-        tidy_basic <- edges %>% 
-          as_tbl_graph()
-        scores <- d.training.summary[unlist(nodes),"log2FC"]
-        tidy_basic_manipulated <- tidy_basic %>% 
-          activate(nodes) %>%
-          mutate(colours = scores)  
-        
-        png(file=paste0('output/', n, '/training/figures/GO_', module, '_subnetwork.png'), width=1920, height=1020)
-        print(ggraph(tidy_basic_manipulated, layout = 'circle')+
-                geom_edge_link(width = 1.2,alpha=0.2) +
-                geom_node_point(aes(color = scores), size=15) +
-                coord_fixed() +
-                geom_node_text(aes(label = name,fontface='bold'),size=5.5, repel=TRUE) +
-                scale_color_gradient2(low = "blue", mid="white", high = "red", limits = c(3,3), breaks = c(-2.5,-2,-1,0,1,2,2.5)) +
-                scale_x_continuous(limits=c(-2,2)) +
-                scale_y_continuous(limits=c(-2,2)) +
-                labs(colour="Log-fold change", title=paste(module, "subnetwork")) +
-                theme_prism(base_size = 25,base_fontface = "bold") +
-                theme(legend.key.height = unit(30, "pt"),
-                      legend.title = element_text(size=20),
-                      legend.key.width = unit(15, "pt"),
-                      legend.text = element_text(size=20),
-                      legend.position = c(1.1, 0.5)))
-        dev.off()
-        
-        for (rown in nrow(nodes)){
-          nodes2 <- unlist(nodes[rown,])
-          print(paste("In subnetwork: ", nodes2))
-          genes <- append(genes, nodes2)
-          
-          log2Subnetwork <- log2vals[nodes2]
-          print(paste("Log-fold changes: ", log2Subnetwork))
-          
-          PSubnetwork <- pvals[nodes2]
-          print(paste("P-values: ", PSubnetwork))
-          
-          try({nodes2[substr(nodes2,1,3) == "LOC"] <- mapIds(org.Hs.eg.db, keys = gsub('LOC', '', nodes2[substr(nodes2,1,3) == "LOC"]), column = "SYMBOL", keytype="ENTREZID")}, silent=TRUE)
-          
-          try({nodes2[which(is.na(mapIds(org.Hs.eg.db, keys = nodes2, column = "ENTREZID", keytype="SYMBOL")))] <- mapIds(org.Hs.eg.db, keys = nodes2[which(is.na(mapIds(org.Hs.eg.db, keys = nodes2, column = "ENTREZID", keytype="SYMBOL")))], column = "SYMBOL", keytype="ALIAS")}, silent=TRUE)
-          
-          nodes2[which(nodes2 == "LOC101929759")] <- "SLCO5A1-AS1"
-          nodes2[which(nodes2 == "LOC107984285")] <- "LARP4B"
-          nodes2[which(nodes2 == "UNQ6494")] <- "LINC03062"
-          nodes2[which(nodes2 == "FLJ22447")] <- "LINC03033"
-          nodes2[which(nodes2 == "FLJ37453")] <- "SPEN-AS1"
-          nodes2[which(nodes2 == "MPP6")] <- "PALS2"
-          nodes2[which(nodes2 == "TIAF1")] <- "MYO18A"
-          nodes2[which(nodes2 == "H4-16")] <- "H4C16"
-          nodes2[which(nodes2 == "CBWD3")] <- "ZNG1C"
-          nodes2[which(nodes2 == "LCA10")] <- "L1CAM-AS1"  
-          
-          geneNames <- c()
-          try({geneNames <- mapIds(org.Hs.eg.db, keys = nodes2, column = "ENTREZID", keytype = "SYMBOL")}, silent=TRUE)
-          
-          print(paste("Number of genes: ", length(geneNames)))
-          if (is.null(geneNames)){next}
-          else {
-            goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
-            goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
-            top_BP <- data.frame()
-            top_MF <- data.frame()
-            if (!(is.null(goBP))){
-              if (nrow(goBP) > 0){
-                print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust <= 0.1,])))
-                
-                write.table(goBP@result[goBP@result$p.adjust <= 0.1,], file=paste0('output/', n, '/training/output/GO/', module, rown, 'BP.tsv'), col.names=TRUE, row.names=FALSE, sep='\t', quote=FALSE)
-                BPterms <- append(BPterms, rownames(goBP@result[goBP@result$p.adjust <= 0.1,]))
-                
-                top_BP <- head(goBP@result[order(goBP@result$p.adjust), ], 5)
-                top_BP <- top_BP %>% mutate(Description = paste("GO:BP", Description))  
-              }
-            }
-            if (!(is.null(goMF))){
-              if (nrow(goMF) > 0){
-                print(paste("Number of enriched molecular functions: ", nrow(goMF[goMF$p.adjust <= 0.1,])))
-                
-                write.table(goMF@result[goMF@result$p.adjust <= 0.1,], file=paste0('output/', n, '/training/output/GO/', module, rown, 'MF.tsv'), col.names=TRUE, row.names=FALSE, sep='\t', quote=FALSE)
-                MFterms <- append(MFterms, rownames(goMF@result[goMF@result$p.adjust <= 0.1,]))
-                
-                top_MF <- head(goMF@result[order(goMF@result$p.adjust), ], 5)
-                top_MF <- top_MF %>% mutate(Description = paste("GO:MF", Description))
-              }
-            }
-            top <- rbind(top_BP,top_MF)
-            if (nrow(top) > 0){
-              top <- top[order(top$p.adjust), ]
-              png(file=paste0('output/', n, '/training/figures/GO_', module, rown, '.png'), width=1920, height=1020)
-              print(ggplot(top, aes(x = Count, y = reorder(Description, -p.adjust), fill = p.adjust)) +
-                      geom_bar(stat = "identity") +
-                      scale_fill_gradient(low = "red", high = "blue") +
-                      labs(title = "Gene Ontology Enrichment Analysis",
-                           x = "Count",
-                           fill = "Adjusted p-value",
-                           y="") +
-                      scale_y_discrete(labels = function(x) str_wrap(x, width = 65)) +
-                      theme_prism(base_size = 18) +
-                      theme(legend.text = element_text(size=25),
-                            legend.title = element_text(size=25)))
-              dev.off()
-              write.table(top, file=paste0('output/', n, '/training/output/GO_', module, rown, '.tsv'), row.names=TRUE, col.names=TRUE, sep='\t')
-            }
-          }
-        }
-      }  
-    }
-  }
-  
-  write.table(BPterms, file=paste0('output/', n, '/training/output/GO/BP.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  write.table(MFterms, file=paste0('output/', n, '/training/output/GO/MF.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  write.table(genes, file=paste0('output/', n, '/training/output/GO/genes.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  write.table(subnetworks, file=paste0('output/', n, '/training/output/GO/subnetworks.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  write.table(hotnetSubnetworks, file=paste0('output/', n, '/training/output/GO/hotnetSubnetworks.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  save(BPterms, file=paste0('output/', n, '/training/rdata/BP.RData'))
-  save(MFterms, file=paste0('output/', n, '/training/rdata/MF.RData'))
-  save(genes, file=paste0('output/', n, '/training/rdata/genes.RData'))
-  save(subnetworks, file=paste0('output/', n, '/training/rdata/subnetworks.RData'))
-  
-  time2 <- Sys.time()
-  print(paste("GO:", difftime(time2, time1, units="secs")))
-  endTime <- Sys.time()
-  print(paste("Total time:", difftime(endTime, startTime, units="secs")))
-  
-  ######################################
-  ######    Internal validation   ######
-  ######################################
-  dir.create(paste0('output/', n, '/validation'))
-  dir.create(paste0('output/', n, '/validation/output'))
-  dir.create(paste0('output/', n, '/validation/figures'))
-  dir.create(paste0('output/', n, '/validation/rdata'))
-  
-  selection.val <- colnames(d.raw)[!(colnames(d.raw) %in% selection)]
-  selection.val <- sort(selection.val)
-  save(selection.val, file=paste0('output/', n, '/validation/rdata/sampleSelectionVal.RData'))
-  d.validation <- d.raw[,selection.val]
-  samples <- colnames(d.validation)
-  ids <- rownames(d.validation)
-  group.data.validation <- group.data[selection.val,]
-  d.validation.adj <- d.adj[,selection.val]
-  colnames(d.validation.adj) <- samples
-  groups <- group.data.validation[,hit]
-  
-  time2 <- Sys.time()
-  print(paste("Processing data:", difftime(time2, time1, units="secs")))
-  
-  group <- as.matrix(group.data.validation[,hit])
-  rownames(group) <- rownames(group.data.validation)
-  colnames(group) <- c(hit)
-  
-  ### PLOTS 
-  #
-  #  d.validation.cs <- d.cs[,selection.val]
-  #  d.validation.cs.WT <- d.validation.cs[,rownames(group.data.validation[group.data.validation[,hit] == "WT",])]
-  #  d.validation.cs.SNV <- d.validation.cs[,rownames(group.data.validation[group.data.validation[,hit] == "SNV",])]
-  #
-  #  colors = c(seq(-5,-1,length=1000),seq(-.999999,.999999,length=1000),seq(1, 5,length=1000))
-  #  my_palette <- colorRampPalette(c("blue", "white", "red"))(n = 2999)
-  #  png(file=paste0('output/', n, '/validation/figures/heatmapSNVSubset.png'), width=1920, height=1020)
-  #    pheatmap(d.validation.cs.SNV,
-  #             legend=TRUE,
-  #             color=my_palette,
-  #             breaks=colors,
-  #             show_rownames=FALSE,
-  #             show_colnames=FALSE
-  #    )
-  #  dev.off()
-  #  
-  #  png(file=paste0('output/', n, '/validation/figures/heatmapWTSubset.png'), width=1920, height=1020)
-  #    pheatmap(d.validation.cs.WT,
-  #             legend=TRUE,
-  #             color=my_palette,
-  #             breaks=colors,
-  #             show_rownames=FALSE,
-  #             show_colnames=FALSE
-  #    )
-  #  dev.off()
-  #
-  #  png(file=paste0('output/', n, '/validation/figures/heatmap.png'), width=1920, height=1020)
-  #    pheatmap(d.validation.cs, color=my_palette, cluster_rows=TRUE, show_rownames=FALSE, cluster_cols=TRUE, show_colnames = FALSE, annotation_col=as.data.frame(group), cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #  dev.off()
-  
-  colnames(d.validation) <- groups
-  
-  #  png(file=paste0('output/', n, '/validation/figures/sampleCluster.png'), width=1920, height=1020)
-  #  plotClusterTreeSamples(t(d.validation), as.numeric(factor(groups)), cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #  dev.off()
-  #  
-  #  sampleDists <- dist(t(d.validation))
-  #  sampleDistMatrix <- as.matrix(sampleDists)
-  #  rownames(sampleDistMatrix) <- colnames(d.validation)
-  #  colnames(sampleDistMatrix) <- colnames(d.validation)
-  #  png(file=paste0('output/', n, '/validation/figures/sampleDistances.png'), width=1920, height=1020)
-  #    pheatmap(sampleDistMatrix,
-  #             clustering_distance_rows=sampleDists,
-  #             clustering_distance_cols=sampleDists,
-  #             col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
-  #  dev.off()
-  #  
-  #  geneDists <- dist(d.validation)
-  #  geneDistMatrix <- as.matrix(geneDists)
-  #  rownames(geneDistMatrix) <- rownames(d.validation)
-  #  colnames(geneDistMatrix) <- rownames(d.validation)
-  #  png(file=paste0('output/', n, '/validation/figures/geneDistances.png'), width=1920, height=1020)
-  #    pheatmap(geneDistMatrix,
-  #             clustering_distance_rows=geneDists,
-  #             clustering_distance_cols=geneDists,
-  #             col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
-  #  dev.off()
-  #  
-  #  png(file=paste0('output/', n, '/validation/figures/meanExpressionSelection.png'), width=1920, height=1020)
-  #  barplot(apply(t(d.validation),1,mean, na.rm=T),
-  #          xlab = "Sample", ylab = "Mean expression",
-  #          main ="Mean expression across samples", cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #  dev.off()
-  #
-  #  png(file=paste0('output/', n, '/validation/figures/heatmapVST.png'), width=1920, height=1020)
-  #    pheatmap(d.validation.adj, color=my_palette, cluster_rows=TRUE, show_colnames=FALSE, cluster_cols=TRUE, show_rownames = FALSE, annotation_col=as.data.frame(group))
-  #  dev.off()
-  
-  colnames(d.validation.adj) <- groups
-  
-  #  png(file=paste0('output/', n, '/validation/figures/sampleClusterVST.png'), width=1920, height=1020)
-  #    plotClusterTreeSamples(t(d.validation.adj), as.numeric(factor(groups)), cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #  dev.off()
-  #  
-  #  sampleDists.adj <- dist(t(d.validation.adj))
-  #  sampleDistMatrix.adj <- as.matrix(sampleDists.adj)
-  #  rownames(sampleDistMatrix.adj) <- colnames(d.validation.adj)
-  #  colnames(sampleDistMatrix.adj) <- colnames(d.validation.adj)
-  #  png(file=paste0('output/', n, '/validation/figures/sampleDistancesVST.png'), width=1920, height=1020)
-  #    pheatmap(sampleDistMatrix.adj,
-  #             clustering_distance_rows=sampleDists.adj,
-  #             clustering_distance_cols=sampleDists.adj,
-  #             col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
-  #  dev.off()
-  #  
-  #  geneDists.adj <- dist(d.validation.adj)
-  #  geneDistMatrix.adj <- as.matrix(geneDists.adj)
-  #  rownames(geneDistMatrix.adj) <- rownames(d.validation.adj)
-  #  colnames(geneDistMatrix.adj) <- rownames(d.validation.adj)
-  #  png(file=paste0('output/', n, '/validation/figures/geneDistancesVST.png'), width=1920, height=1020)
-  #    pheatmap(geneDistMatrix.adj,
-  #             clustering_distance_rows=geneDists.adj,
-  #             clustering_distance_cols=geneDists.adj,
-  #             col=my_palette, cex.lab = 2, cex.axis = 2, cex.main = 2, show_colnames = FALSE, show_rownames = FALSE)
-  #  dev.off()
-  #
-  #  png(file=paste0('output/', n, '/validation/figures/meanExpressionSelectionVST.png'), width=1920, height=1020)
-  #  barplot(apply(t(d.validation.adj),1,mean, na.rm=T),
-  #          xlab = "Sample", ylab = "Mean expression",
-  #          main ="Mean expression across samples", cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #  dev.off()
-  
-  ### Save input data
-  save(d.validation, d.validation.adj, group.data.validation, group, file=(paste0('output/', n, '/validation/rdata/input_data.RData')))
-  
-  #######################################
-  #######         DESeq2           ######
-  #######################################
-  dir.create(paste0('output/', n, '/validation/figures/differential expression'))
-  dir.create(paste0('output/', n, '/validation/output/differential expression'))
-  
-  time1 <- Sys.time()
-  colnames(d.validation) <- samples
-  group[,1] <- factor(group[,1], levels = c("WT","SNV"))
-  dds <- DESeqDataSetFromMatrix(countData = d.validation, colData = group, design = formula(paste("~",hit)))
-  dds
-  
-  dds <- DESeq(dds)
-  res <- results(dds)
-  res
-  summary(res)
-  
-  colnames(d.validation) <- groups
-  
-  d.validation.summary <- data.frame(unlist(res$log2FoldChange), unlist(res$padj), row.names = rownames(res))
-  colnames(d.validation.summary) <- c("log2FC", "Pvalue")
-  d.validation.summary <- na.omit(d.validation.summary)
-  d.validation.adj <- d.validation.adj[rownames(d.validation.adj) %in% rownames(d.validation.summary),]
-  ids <- rownames(d.validation.adj)
-  time2<- Sys.time()
-  print(paste("DESeq2:", difftime(time2, time1, units="secs")))
-  
-  write.table(d.validation.summary[,"log2FC", drop = FALSE], file=paste0('output/', n, '/validation/output/differential expression/DE_LFC.tsv'), row.names=TRUE, col.names=TRUE, sep='\t')
-  
-  ###DESEQ PLOTS
-  d.validation.summary2 <- d.validation.summary %>% 
-    mutate(
-      Expression = case_when(log2FC >= 0.1 & Pvalue <= 0.1 ~ "Up-regulated",
-                             log2FC <= -0.1 & Pvalue <= 0.1 ~ "Down-regulated",
-                             TRUE ~ "Unchanged")
-    )  %>%
-    arrange(desc(log2FC))
-  
-  d.validation.summary2 <- cbind(gene=rownames(d.validation.summary2), d.validation.summary2)
-  
-  png(file=paste0('output/', n, '/validation/figures/differential expression/volcano.png'), width=1920, height=1020)
-  print(ggplot(d.validation.summary2, aes(log2FC, -log(Pvalue,10))) +
-          geom_point(aes(color = Expression), size = 2) +
-          xlab(expression("log"[2]*"FC")) + 
-          ylab(expression("-log"[10]*"adjusted p-value")) +
-          scale_color_manual(values = c("Up-regulated" = "red", "Down-regulated" = "blue", "Unchanged" = "grey")) +
-          scale_x_continuous(
-            limits = c(-4, 4),
-            breaks = seq(-4, 4, by = 0.5),
-            guide = "prism_minor") +
-          scale_y_continuous(
-            limits = c(0, 15),
-            breaks = seq(0, 15, by = 3)) +
-          geom_label_repel(data=head(filter(d.validation.summary2, Pvalue<=0.1),10), aes(label=gene,fontface='bold',segment.size=1), box.padding = 0.5, size=6, xlim  = c(3,4), min.segment.length = 0) +
-          geom_label_repel(data=tail(filter(d.validation.summary2, Pvalue<=0.1),10), aes(label=gene,fontface='bold',segment.size=1), box.padding = 0.5, size=6, xlim  = c(-4,-3), min.segment.length = 0) +
-          guides(colour = guide_legend(override.aes = list(size=3))) +
-          theme_prism(border=TRUE,base_size = 25) +
-          theme(legend.key.height = unit(30, "pt"),
-                legend.title = element_text(size=25),
-                legend.text = element_text(size=25),
-                legend.margin = margin(0, 30, 0, 0)) +
-          labs(title = "DESeq2 log-fold changes and p-values"))
-  dev.off()
-  
-  dds2 <- as.data.frame(mcols(dds)) %>% 
-    select(baseMean, dispGeneEst, dispFit, dispersion) %>% 
-    melt(id.vars="baseMean") %>% 
-    filter(baseMean>0) %>%
-    arrange(factor(variable, levels=c("dispGeneEst","dispersion","dispFit")))
-  
-  png(file=paste0('output/', n, '/validation/figures/differential expression/dispersion.png'), width=1920, height=1020)
-  print(ggplot(dds2, aes(x=baseMean, y=value, colour=variable)) + 
-          geom_point(size=1.5) +
-          scale_x_log10() + 
-          scale_y_log10() + 
-          theme_bw() + 
-          ylab("Dispersion") + 
-          xlab("BaseMean") +
-          scale_colour_manual(
-            values=c("Black", "#377eb8", "Red"), 
-            breaks=c("dispGeneEst", "dispersion", "dispFit"), 
-            labels=c("Estimate", "Final", "Fit"),
-            name=""
-          ) +
-          guides(colour = guide_legend(override.aes = list(size=2))) +
-          theme_prism(base_size = 30) +
-          theme(legend.key.height = unit(30, "pt"),
-                legend.title = element_text(size=25),
-                legend.text = element_text(size=25)) +
-          labs(title = "DESeq2 dispersion"))
-  dev.off()
-  
-  #  use <- res$baseMean > metadata(res)$filterThreshold
-  #  h1 <- hist(res$pvalue[!use], breaks=0:50/50, plot=FALSE)
-  #  h2 <- hist(res$pvalue[use], breaks=0:50/50, plot=FALSE)
-  #  colori <- c(`do not pass`="khaki", `pass`="powderblue")
-  #  png(file=paste0('output/', n, '/validation/figures/differential expression/pass.png'), width=1920, height=1020)
-  #    barplot(height = rbind(h1$counts, h2$counts), beside = FALSE,
-  #            col = colori, space = 0, main = "", ylab="frequency", cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #    text(x = c(0, length(h1$counts)), y = 0, label = paste(c(0,1)),
-  #         adj = c(0.5,1.7), xpd=NA)
-  #    legend("topright", fill=rev(colori), legend=rev(names(colori)))
-  #  dev.off()
-  
-  #######################################
-  #######          GSEA           #######
-  #######################################
-  dir.create(paste0('output/', n, '/validation/figures/GO'))
-  dir.create(paste0('output/', n, '/validation/output/GO'))
-  
-  geneList.validation <- d.validation.summary[,1]
-  names(geneList.validation) <- rownames(d.validation.summary)
-  geneList.validation <- sort(geneList.validation, decreasing = TRUE)
-  write.table(names(geneList.validation), file=paste0('output/', n, '/validation/output/differential expression/DE_genes.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  rows <- names(geneList.validation)
-  try({rows[substr(rows,1,3) == "LOC"] <- mapIds(org.Hs.eg.db, keys = gsub('LOC', '', rows[substr(rows,1,3) == "LOC"]), column = "SYMBOL", keytype="ENTREZID")}, silent=TRUE)
-  try({rows[which(is.na(mapIds(org.Hs.eg.db, keys = rows, column = "ENTREZID", keytype="SYMBOL")))] <- mapIds(org.Hs.eg.db, keys = rows[which(is.na(mapIds(org.Hs.eg.db, keys = rows, column = "ENTREZID", keytype="SYMBOL")))],     column = "SYMBOL", keytype="ALIAS")}, silent=TRUE)
-  rows[which(rows == "LOC101929759")] <- "SLCO5A1-AS1"
-  rows[which(rows == "LOC107984285")] <- "LARP4B"
-  rows[which(rows == "UNQ6494")] <- "LINC03062"
-  rows[which(rows == "FLJ22447")] <- "LINC03033"
-  rows[which(rows == "FLJ37453")] <- "SPEN-AS1"
-  rows[which(rows == "MPP6")] <- "PALS2"
-  rows[which(rows == "TIAF1")] <- "MYO18A"
-  rows[which(rows == "H4-16")] <- "H4C16"
-  rows[which(rows == "CBWD3")] <- "ZNG1C"
-  rows[which(rows == "LCA10")] <- "L1CAM-AS1" 
-  names(geneList.validation) <- mapIds(org.Hs.eg.db, keys = rows, column = "ENTREZID", keytype = "SYMBOL")
-  
-  gsea.validation.BP <- gseGO(geneList     = geneList.validation,
-                              OrgDb        = org.Hs.eg.db,
-                              ont          = "BP",
-                              pvalueCutoff = 0.1,
-                              eps = 0)
-  
-  gsea.validation.MF <- gseGO(geneList     = geneList.validation,
-                              OrgDb        = org.Hs.eg.db,
-                              ont          = "MF",
-                              pvalueCutoff = 0.1,
-                              eps = 0)
-  
-  
-  #gsea.validation.KEGG <- GSEA(geneList.validation, pvalueCutoff = 0.1, TERM2GENE = msigdbr(species = "Homo sapiens", category = "C2", subcategory="KEGG") %>% 
-  #dplyr::select(gs_name, entrez_gene))
-  
-  top_BP <- head(gsea.validation.BP@result[order(gsea.validation.BP@result$p.adjust), ], 5)
-  top_MF <- head(gsea.validation.MF@result[order(gsea.validation.MF@result$p.adjust), ], 5)
-  #top_KEGG <- head(gsea.validation.KEGG[order(gsea.validation.KEGG@result$p.adjust), ], 5)
-  
-  top_BP <- top_BP %>% mutate(Description = paste("GO:BP", Description))
-  top_MF <- top_MF %>% mutate(Description = paste("GO:MF", Description))
-  #top_KEGG <- top_KEGG %>% mutate(Description = paste("KEGG", Description))
-  
-  #top <- rbind(top_BP,top_MF,top_KEGG)
-  top <- rbind(top_BP,top_MF)
-  top <- top[order(top$p.adjust), ]
-  
-  png(file=paste0('output/', n, '/validation/figures/GO/GSEA.png'), width=1920, height=1020)
-  print(ggplot(top, aes(x = NES, y = reorder(Description, -p.adjust), fill = p.adjust)) +
-          geom_bar(stat = "identity") +
-          scale_fill_gradient(low = "red", high = "blue") +  # You can adjust colors as needed
-          labs(title = "Gene Ontology Enrichment Analysis",
-               x = "NES",
-               fill = "Adjusted p-value",
-               y="") +
-          scale_y_discrete(labels = function(x) str_wrap(x, width = 60)) +
-          theme_prism(base_size = 28) +
-          theme(plot.title = element_text(hjust = 0.75)) +
-          theme(legend.text = element_text(size=24),
-                legend.title = element_text(size=26)))
-  dev.off()
-  
-  write.table(rownames(gsea.validation.BP@result[gsea.validation.BP@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/validation/output/GO/GSEA_BP.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  write.table(rownames(gsea.validation.MF@result[gsea.validation.MF@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/validation/output/GO/GSEA_MF.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  #write.table(rownames(gsea.validation.KEGG@result[gsea.validation.KEGG@result$p.adjust <= 0.1,]), file=paste0('output/', n, '/validation/output/GO/GSEA_KEGG.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  save(geneList.validation, d.validation.summary, dds, top, file=paste0('output/', n, '/validation/rdata/DE_data.RData'))
-  
-  #######################################
-  ######           WGCNA           ######
-  #######################################
-  dir.create(paste0('output/', n, '/validation/figures/coexpression'))
-  dir.create(paste0('output/', n, '/validation/output/coexpression'))
-  
-  time1 <- Sys.time()
-  d.validation.log2vals <- as.data.frame(d.validation.summary[, c('log2FC')], row.names=row.names(d.validation.summary))
-  colnames(d.validation.log2vals) <- c('log2FC')
-  coexpression <- coexpression.analysis(t(d.validation.adj), d.validation.log2vals, paste0('output/', n, '/validation/output/coexpression'), paste0('output/', n, '/validation/figures/coexpression'), n, 'validation')
-  wgcna.net <- coexpression[[1]]
-  module.significance <- coexpression[[2]]
-  power <- coexpression[[3]]
-  time2 <- Sys.time()
-  print(paste("WGCNA:", difftime(time2, time1, units="secs")))
-  moduleColors <- labels2colors(wgcna.net$colors)
-  modules <- levels(as.factor(moduleColors))
-  write.table(modules, file=paste0('output/', n, '/validation/output/coexpression/modules.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  
-  ids <- ids[moduleColors != "grey"]
-  log2vals <- d.validation.summary[ids, "log2FC"]  
-  pvals <- d.validation.summary[ids, "Pvalue"]
-  names(log2vals) <- ids
-  names(pvals) <- ids
-  
-  ### PLOTS
-  TOM <- TOMsimilarityFromExpr(t(d.validation.adj[ids,]), power=power, TOMType="unsigned")
-  diss2 <- 1-TOM
-  hier2 <- hclust(as.dist(diss2), method="average")
-  colorDynamicTOM <- labels2colors(cutreeDynamic(hier2,method="tree"))
-  diag(diss2) = NA;
-  moduleColors2 <- moduleColors[moduleColors != "grey"]
-  
-  datME <- moduleEigengenes(t(d.validation.adj[ids,]),colorDynamicTOM)$eigengenes
-  dissimME <- (1-t(cor(datME, use="p")))/2
-  hclustdatME <- hclust(as.dist(dissimME), method="average")
-  par(mfrow=c(1,1))
-  png(file=paste0('output/', n, '/validation/figures/coexpression/moduleEigengenes.png'), width=1920, height=1020)
-  plot(hclustdatME, main="Clustering tree based of the module eigengenes", cex.lab = 2, cex.axis = 2, cex.main = 2)
-  dev.off()
-  
-  #  GS1 <- as.numeric(cor(group,t(d.validation.adj[ids,])))
-  #  GeneSignificance <- abs(GS1)
-  #  ModuleSignificance <- tapply(GeneSignificance, colorDynamicTOM, mean, na.rm=T)
-  #  png(file=paste0('output/', n, '/validation/figures/coexpression/moduleSignificance2.png'), width=1920, height=1020)
-  #    plotModuleSignificance(GeneSignificance,colorDynamicTOM, cex.lab = 2, cex.axis = 2, cex.main = 2)
-  #  dev.off()
-  #  
-  #  MEs <- orderMEs(datME)
-  #  modNames <- substring(names(MEs), 3)
-  #  geneModuleMembership <- as.data.frame(cor(t(d.validation.adj[ids,]), MEs, use = "p"));
-  #  names(geneModuleMembership) <- paste0("MM", modNames);
-  #  GS1 <- as.data.frame(GS1)
-  #  names(GS1) = paste0("GS.", names(groups))
-  
-  disableWGCNAThreads()
-  
-  save(hclustdatME, file=(paste0('output/', n, '/validation/rdata/coexpression_data.RData')))
-  
-  ########################################
-  ######     Hierarchical HotNet    ######
-  ########################################
-  dir.create(paste0('output/', n, '/validation/figures/hotnet'))
-  dir.create(paste0('output/', n, '/validation/output//hotnet'))
-  dir.create(paste0('output/', n, '/validation/output/hotnet/HotNet_input'))
-  
-  corPVal <- corAndPvalue(t(d.validation.adj[ids,]), use="pairwise.complete.obs")
-  
-  cutOff <- 0.5
-  print(paste("Cut off:", cutOff))
-  
-  hotnetColors <- c()
-  
-  for (module in modules){
-    if (module == "grey"){
-      next
-    } 
-    else {
-      print(module)
-      
-      inModule <- moduleColors2 == module
-      sum(inModule)
-      TOMmodule <- TOM[inModule, inModule]
-      corModule <- corPVal[["cor"]][inModule, inModule]
-      idsModule <- ids[inModule]
-      write.table(idsModule, file=paste0('output/', n, '/validation/output/coexpression/', module, '.tsv'), sep='\t', row.names=FALSE, col.names=FALSE)
-      log2Module <- log2vals[inModule]
-      PModule <- pvals[inModule]
-      
-      node.frame <- data.frame(Symbol=idsModule, LogFC=abs(log2Module), Pvalue=PModule)
-      rownames(node.frame) <- 1:nrow(node.frame)
-      #node.frame$InvPvalue <- 1 - PModuleProteins
-      # write.table(node.frame[, c('Symbol', 'InvPvalue')], file=paste0('output/', n, '/validation/output/hotnet/HotNet_input/g2s_Pval_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-      names(idsModule) <- idsModule
-      
-      write.table(node.frame[, c('Symbol', 'LogFC')], file=paste0('output/', n, '/validation/output/hotnet/HotNet_input/g2s_log2_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-      
-      time1 <- Sys.time()
-      
-      combine <- function(x,y){
-        w1 <- rbind(x[[1]], y[[1]])
-        x1 <- rbind(x[[2]], y[[2]])
-        y1 <- rbind(x[[3]], y[[3]])
-        z1 <- rbind(x[[4]], y[[4]])
-        y1 <- y1[!duplicated(y1), ]
-        z1 <- z1[!duplicated(z1), ]
-        return(list(w1,x1,y1,z1))
-      }
-      
-      result <- foreach(i = 1:(nrow(TOMmodule)-1), .combine = 'combine', .inorder = TRUE) %dopar% {
-        result1 <- data.frame(matrix(nrow=0,ncol=2))
-        result2 <- data.frame(matrix(nrow=0,ncol=2))
-        result3 <- data.frame(matrix(nrow=0,ncol=2))
-        result4 <- data.frame(matrix(nrow=0,ncol=2))
-        for (j in (i+1):nrow(TOMmodule)){
-          if (corModule[i,j] >= 0.5 || corModule[i,j] <= -0.5){
-            result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
-            result2[nrow(result2)+1,] <- c(i,j)
-            if (!i %in% result3[,1]){
-              result3[nrow(result3)+1,] <- c(i, idsModule[i])
-              result4[nrow(result4)+1,] <- c(idsModule[i], abs(log2Module[i]))
-            } 
-            if (!j %in% result3[,1]){
-              result3[nrow(result3)+1,] <- c(j, idsModule[j])
-              result4[nrow(result4)+1,] <- c(idsModule[j], abs(log2Module[j]))
-            }
-          }
-        }
-        return(list(result1, result2, result3, result4))
-      }
-      time2 <- Sys.time()
-      print(paste("Slicing input:", difftime(time2, time1, units="secs")))
-      time1 <- Sys.time()
-      write.table(result[[1]], file=paste0('output/', n, '/validation/output/hotnet/HotNet_input/name_edges_expression_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-      write.table(result[[2]], file=paste0('output/', n, '/validation/output/hotnet/HotNet_input/edge_list_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-      write.table(result[[3]], file=paste0('output/', n, '/validation/output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-      write.table(result[[4]], file=paste0('output/', n, '/validation/output/hotnet/HotNet_input/g2s_log2_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
-      time2 <- Sys.time()
-      print(paste("Writing data:", difftime(time2, time1, units="secs")))
-      if (file.info(paste0('output/', n, '/validation/output/hotnet/HotNet_input/i2g_', module, '.tsv'))$size != 0){
-        hotnetColors <- append(hotnetColors, module)
-      }
-    }
+    save(geneList.subset, d.subset.summary, dds, top, file=paste0('output/', n, '/', dataset, '/rdata/DE_data.RData'))
     
-    idsModule2 <- idsModule
+    #######################################
+    ######           WGCNA           ######
+    #######################################
+    dir.create(paste0('output/', n, '/', dataset, '/figures/coexpression'))
+    dir.create(paste0('output/', n, '/', dataset, '/output/coexpression'))
     
-    try({idsModule2[substr(idsModule2,1,3) == "LOC"] <- mapIds(org.Hs.eg.db, keys = gsub('LOC', '', idsModule2[substr(idsModule2,1,3) == "LOC"]), column = "SYMBOL", keytype="ENTREZID")},silent=TRUE)
+    time1 <- Sys.time()
+    d.subset.log2vals <- as.data.frame(d.subset.summary[, c('log2FC')], row.names=row.names(d.subset.summary))
+    colnames(d.subset.log2vals) <- c('log2FC')
+    coexpression <- coexpression.analysis(t(d.subset.adj), d.subset.log2vals, paste0('output/', n, '/', dataset, '/output/coexpression'), paste0('output/', n, '/', dataset, '/figures/coexpression'), n, dataset)
+    wgcna.net <- coexpression[[1]]
+    module.significance <- coexpression[[2]]
+    power <- coexpression[[3]]
+    time2 <- Sys.time()
+    print(paste("WGCNA:", difftime(time2, time1, units="secs")))
+    moduleColors <- labels2colors(wgcna.net$colors)
+    modules <- levels(as.factor(moduleColors))
+    write.table(modules, file=paste0('output/', n, '/', dataset, '/output/coexpression/modules.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
     
-    try({idsModule2[which(is.na(mapIds(org.Hs.eg.db, keys = idsModule2, column = "ENTREZID", keytype="SYMBOL")))] <- mapIds(org.Hs.eg.db, keys = idsModule2[which(is.na(mapIds(org.Hs.eg.db, keys = idsModule2, column = "ENTREZID", keytype="SYMBOL")))], column = "SYMBOL", keytype="ALIAS")},silent=TRUE)
+    ids.subset <- ids.subset[moduleColors != "grey"]
+    log2vals <- d.subset.summary[ids.subset, "log2FC"]
+    pvals <- d.subset.summary[ids.subset, "Pvalue"]
+    names(log2vals) <- ids.subset
+    names(pvals) <- ids.subset
     
-    idsModule2[which(idsModule2 == "LOC101929759")] <- "SLCO5A1-AS1"
-    idsModule2[which(idsModule2 == "LOC107984285")] <- "LARP4B"
-    idsModule2[which(idsModule2 == "UNQ6494")] <- "LINC03062"
-    idsModule2[which(idsModule2 == "FLJ22447")] <- "LINC03033"
-    idsModule2[which(idsModule2 == "FLJ37453")] <- "SPEN-AS1"
-    idsModule2[which(idsModule2 == "MPP6")] <- "PALS2"
-    idsModule2[which(idsModule2 == "TIAF1")] <- "MYO18A"
-    idsModule2[which(idsModule2 == "H4-16")] <- "H4C16"
-    idsModule2[which(idsModule2 == "CBWD3")] <- "ZNG1C"
-    idsModule2[which(idsModule2 == "LCA10")] <- "L1CAM-AS1"  
+    ### PLOTS
+    TOM <- TOMsimilarityFromExpr(t(d.subset.adj[ids.subset,]), power=power, TOMType="unsigned")
+    diss2 <- 1-TOM
+    hier2 <- hclust(as.dist(diss2), method="average")
+    colorDynamicTOM <- labels2colors(cutreeDynamic(hier2,method="tree"))
+    diag(diss2) = NA;
+    moduleColors2 <- moduleColors[moduleColors != "grey"]
     
-    geneNames <- c()
-    try({geneNames <- mapIds(org.Hs.eg.db, keys = idsModule2, column = "ENTREZID", keytype = "SYMBOL")}, silent=TRUE)
+    datME <- moduleEigengenes(t(d.subset.adj[ids.subset,]),colorDynamicTOM)$eigengenes
+    dissimME <- (1-t(cor(datME, use="p")))/2
+    hclustdatME <- hclust(as.dist(dissimME), method="average")
+    par(mfrow=c(1,1))
+    png(file=paste0('output/', n, '/', dataset, '/figures/coexpression/moduleEigengenes.png'), width=1920, height=1020)
+    plot(hclustdatME, main="Clustering tree based of the module eigengenes", cex.lab = 2, cex.axis = 2, cex.main = 2)
+    dev.off()
     
-    if (is.null(geneNames)){next}
-    
-    goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
-    goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
-    
-    top_BP <- data.frame()
-    if (!is.null(goBP)){
-      top_BP <- head(goBP@result[order(goBP@result$p.adjust), ], 5)
-      top_BP <- top_BP %>% mutate(Description = paste("GO:BP", Description))  
-    }
-    top_MF <- data.frame()
-    if (!is.null(goMF)){
-      top_MF <- head(goMF@result[order(goMF@result$p.adjust), ], 5)
-      top_MF <- top_MF %>% mutate(Description = paste("GO:MF", Description))        
-    }
-    #      top_KEGG <- data.frame()
-    #      if (!is.null(goKEGG)){
-    #        top_KEGG <- head(goKEGG@result[order(goKEGG@result$p.adjust), ], 5)
-    #        top_KEGG <- top_KEGG %>% mutate(Description = paste("KEGG", Description))        
-    #      }
-    
-    #top <- rbind(top_BP,top_MF,top_KEGG)
-    top <- rbind(top_BP,top_MF)
-    
-    if (nrow(top) > 0){
-      top <- top[order(top$p.adjust), ]
-      png(file=paste0('output/', n, '/validation/figures/coexpression/GO_', module, '.png'), width=1920, height=1020)
-      print(ggplot(top, aes(x = Count, y = reorder(Description, -p.adjust), fill = p.adjust)) +
-              geom_bar(stat = "identity") +
-              scale_fill_gradient(low = "red", high = "blue") +
-              labs(title = "Gene Ontology Enrichment Analysis",
-                   x = "Count",
-                   fill = "Adjusted p-value",
-                   y="") +
-              scale_y_discrete(labels = function(x) str_wrap(x, width = 60)) +
-              theme_prism(base_size = 28) +
-              theme(plot.title = element_text(hjust = 0.75)) +
-              theme(legend.text = element_text(size=24),
-                    legend.title = element_text(size=26)))
-      dev.off()
-    }
-    
-    write.table(goBP@result[goBP@result$p.adjust <= 0.1,], file=paste0('output/', n, '/validation/output/coexpression/', module, 'BP.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
-    write.table(goMF@result[goMF@result$p.adjust <= 0.1,], file=paste0('output/', n, '/validation/output/coexpression/', module, 'MF.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
-    #   write.table(goKEGG@result[goKEGG@result$p.adjust <= 0.1,], file=paste0('output/', n, '/validation/output/coexpression/', module, 'KEGG.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
-    write.table(top, file=paste0('output/', n, '/validation/output/coexpression/GO_', module, '.tsv'), row.names=TRUE, col.names=TRUE, sep='\t')
-    
-    #      par(mar = c(1, 1, 1, 1))
-    #      png(file=paste0('output/', n, '/validation/figures/coexpression/', module, '_matrix.png'), width=1920, height=1020)
-    #        plotMat(t(scale(t(d.validation.adj[colorDynamicTOM==module,]))),rlabels=T,
-    #                clabels=T,rcols=module,
-    #                title=module, cex.lab = 2, cex.axis = 2, cex.main = 2)
-    #      dev.off()
-    #      
-    #      ME=datME[, paste0("ME",module)]
-    #      par(mar = c(2, 1, 1, 1))
-    #      png(file=paste0('output/', n, '/validation/figures/coexpression/', module, '_ME.png'), width=1920, height=1020)
-    #        barplot(ME, col=module, main="", cex.main=2,
-    #                ylab="eigengene expression",xlab="array sample", cex.lab = 2, cex.axis = 2, cex.main = 2)
-    #      dev.off()
+    #  GS1 <- as.numeric(cor(group.subset,t(d.subset.adj[ids.subset,])))
+    #  GeneSignificance <- abs(GS1)
+    #  ModuleSignificance <- tapply(GeneSignificance, colorDynamicTOM, mean, na.rm=T)
+    #  png(file=paste0('output/', n, '/', dataset, '/figures/coexpression/moduleSignificance2.png'), width=1920, height=1020)
+    #    plotModuleSignificance(GeneSignificance,colorDynamicTOM, cex.lab = 2, cex.axis = 2, cex.main = 2)
+    #  dev.off()
     #
-    #      par(mfrow = c(1,1));
-    #      column <- match(module, modNames);
-    #      png(file=paste0('output/', n, '/validation/figures/coexpression/', module, '_membershipVSsignficance.png'), width=1920, height=1020)
-    #        verboseScatterplot(abs(geneModuleMembership[inModule, column]),
-    #                           abs(GS1[inModule, 1]),
-    #                           xlab = paste("Module Membership in", module, "module"),
-    #                           ylab = "Gene significance",
-    #                           main = paste("Module membership vs. gene significance\n"),
-    #                           cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
-    #      dev.off()
-    #      }
-  }
-  
-  
-  ######### Run hierarchical hotnet to obtain the most significant submodule within each of the identified modules
-  ######### Note that the HotNet package was written in Python and needs to be intstalled separately on your machine
-  time1 <- Sys.time()
-  system(paste('bash', paste(argv[1],'/src/run_hierarchicalHotnet_modules.sh "', sep=""), paste(hotnetColors, collapse=' '), '" ', cutOff, n, 'validation'))
-  time2 <- Sys.time()
-  print(paste("Hierarchical HotNet:", difftime(time2, time1, units="secs")))
-  
-  time1 <- Sys.time()
-  
-  BPterms <- c()
-  MFterms <- c()
-  genes <- c()
-  subnetworks <- c()
-  hotnetSubnetworks <- c()
-  
-  for (module in hotnetColors){
-    if (file.exists(file=paste0('output/', n, '/validation/output/hotnet/HotNet_results/clusters_hierarchies_log2_', module, '.tsv'))){
-      p <- read.table(file=paste0('output/', n, '/validation/output/hotnet/HotNet_results/clusters_hierarchies_log2_', module, '.tsv'), sep='\t', header= FALSE, comment.char="")[6, "V1"]
-      p <- as.numeric(sub(".*: ", "", p))
-      if (file.exists(paste0('output/', n, '/validation/output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv')) &&
-          file.info(paste0('output/', n, '/validation/output/hotnet//HotNet_results/consensus_nodes_log2_', module, '.tsv'))$size == 0){
+    #  MEs <- orderMEs(datME)
+    #  modNames <- substring(names(MEs), 3)
+    #  geneModuleMembership <- as.data.frame(cor(t(d.subset.adj[ids.subset,]), MEs, use = "p"));
+    #  names(geneModuleMembership) <- paste0("MM", modNames);
+    #  GS1 <- as.data.frame(GS1)
+    #  names(GS1) = paste0("GS.", names(groups.subset))
+    
+    disableWGCNAThreads()
+    
+    save(hclustdatME, file=(paste0('output/', n, '/', dataset, '/rdata/coexpression_data.RData')))
+    
+    ########################################
+    ######     Hierarchical HotNet    ######
+    ########################################
+    dir.create(paste0('output/', n, '/', dataset, '/figures/hotnet'))
+    dir.create(paste0('output/', n, '/', dataset, '/output/hotnet'))
+    dir.create(paste0('output/', n, '/', dataset, '/output/hotnet/HotNet_input'))
+    
+    corPVal <- corAndPvalue(t(d.subset.adj[ids.subset,]), use="pairwise.complete.obs")
+    
+    cutOff <- 0.5
+    print(paste("Cut off:", cutOff))
+    
+    hotnetColors <- c()
+    
+    for (module in modules){
+      if (module == "grey"){
         next
-      }
-      if (!(module %in% hotnetSubnetworks)){hotnetSubnetworks <- append(hotnetSubnetworks, module)}
-      if (p <= 0.1){
+      } 
+      else {
         print(module)
-        if (!(module %in% subnetworks)){subnetworks <- append(subnetworks, module)}
-        nodes <- read.csv(paste0('output/', n, '/validation/output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv'), sep='\t', header = FALSE)
-        edges <- read.csv(paste0('output/', n, '/validation/output/hotnet/HotNet_results/consensus_edges_log2_', module, '.tsv'), sep='\t', header = FALSE)
-        tidy_basic <- edges %>% 
-          as_tbl_graph()
-        scores <- d.validation.summary[unlist(nodes),"log2FC"]
-        tidy_basic_manipulated <- tidy_basic %>% 
-          activate(nodes) %>%
-          mutate(colours = scores)  
+        inModule <- moduleColors2 == module
+        sum(inModule)
+        TOMmodule <- TOM[inModule, inModule]
+        corModule <- corPVal[["cor"]][inModule, inModule]
+        idsModule <- ids.subset[inModule]
+        write.table(idsModule, file=paste0('output/', n, '/', dataset, '/output/coexpression/', module, '.tsv'), sep='\t', row.names=FALSE, col.names=FALSE)
+        log2Module <- log2vals[inModule]
+        PModule <- pvals[inModule]
         
-        png(file=paste0('output/', n, '/validation/figures/GO_', module, '_subnetwork.png'), width=1920, height=1020)
-        print(ggraph(tidy_basic_manipulated, layout = 'circle')+
-                geom_edge_link(width = 1.2,alpha=0.2) +
-                geom_node_point(aes(color = scores), size=15) +
-                coord_fixed() +
-                geom_node_text(aes(label = name,fontface='bold'),size=5.5, repel=TRUE) +
-                scale_color_gradient2(low = "blue", mid="white", high = "red", limits = c(3,3), breaks = c(-2.5,-2,-1,0,1,2,2.5)) +
-                scale_x_continuous(limits=c(-2,2)) +
-                scale_y_continuous(limits=c(-2,2)) +
-                labs(colour="Log-fold change", title=paste(module, "subnetwork")) +
-                theme_prism(base_size = 25,base_fontface = "bold") +
-                theme(legend.key.height = unit(30, "pt"),
-                      legend.title = element_text(size=20),
-                      legend.key.width = unit(15, "pt"),
-                      legend.text = element_text(size=20),
-                      legend.position = c(1.1, 0.5)))
-        dev.off()
+        node.frame <- data.frame(Symbol=idsModule, LogFC=abs(log2Module), Pvalue=PModule)
+        rownames(node.frame) <- 1:nrow(node.frame)
+        #node.frame$InvPvalue <- 1 - PModuleProteins
+        # write.table(node.frame[, c('Symbol', 'InvPvalue')], file=paste0('output/', n, '/', dataset, '/output/hotnet/HotNet_input/g2s_Pval_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+        names(idsModule) <- idsModule
         
-        for (rown in nrow(nodes)){
-          nodes2 <- unlist(nodes[rown,])
-          print(paste("In subnetwork: ", nodes2))
-          genes <- append(genes, nodes2)
-          
-          log2Subnetwork <- log2vals[nodes2]
-          print(paste("Log-fold changes: ", log2Subnetwork))
-          
-          PSubnetwork <- pvals[nodes2]
-          print(paste("P-values: ", PSubnetwork))
-          
-          try({nodes2[substr(nodes2,1,3) == "LOC"] <- mapIds(org.Hs.eg.db, keys = gsub('LOC', '', nodes2[substr(nodes2,1,3) == "LOC"]), column = "SYMBOL", keytype="ENTREZID")}, silent=TRUE)
-          
-          try({nodes2[which(is.na(mapIds(org.Hs.eg.db, keys = nodes2, column = "ENTREZID", keytype="SYMBOL")))] <- mapIds(org.Hs.eg.db, keys = nodes2[which(is.na(mapIds(org.Hs.eg.db, keys = nodes2, column = "ENTREZID", keytype="SYMBOL")))], column = "SYMBOL", keytype="ALIAS")}, silent=TRUE)
-          
-          nodes2[which(nodes2 == "LOC101929759")] <- "SLCO5A1-AS1"
-          nodes2[which(nodes2 == "LOC107984285")] <- "LARP4B"
-          nodes2[which(nodes2 == "UNQ6494")] <- "LINC03062"
-          nodes2[which(nodes2 == "FLJ22447")] <- "LINC03033"
-          nodes2[which(nodes2 == "FLJ37453")] <- "SPEN-AS1"
-          nodes2[which(nodes2 == "MPP6")] <- "PALS2"
-          nodes2[which(nodes2 == "TIAF1")] <- "MYO18A"
-          nodes2[which(nodes2 == "H4-16")] <- "H4C16"
-          nodes2[which(nodes2 == "CBWD3")] <- "ZNG1C"
-          nodes2[which(nodes2 == "LCA10")] <- "L1CAM-AS1"  
-          
-          geneNames <- c()
-          try({geneNames <- mapIds(org.Hs.eg.db, keys = nodes2, column = "ENTREZID", keytype = "SYMBOL")}, silent=TRUE)
-          
-          print(paste("Number of genes: ", length(geneNames)))
-          if (is.null(geneNames)){next}
-          else {
-            goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
-            goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
-            top_BP <- data.frame()
-            top_MF <- data.frame()
-            if (!(is.null(goBP))){
-              if (nrow(goBP) > 0){
-                print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust <= 0.1,])))
-                
-                write.table(goBP@result[goBP@result$p.adjust <= 0.1,], file=paste0('output/', n, '/validation/output/GO/', module, rown, 'BP.tsv'), col.names=TRUE, row.names=FALSE, sep='\t', quote=FALSE)
-                BPterms <- append(BPterms, rownames(goBP@result[goBP@result$p.adjust <= 0.1,]))
-                
-                top_BP <- head(goBP@result[order(goBP@result$p.adjust), ], 5)
-                top_BP <- top_BP %>% mutate(Description = paste("GO:BP", Description))  
+        write.table(node.frame[, c('Symbol', 'LogFC')], file=paste0('output/', n, '/', dataset, '/output/hotnet/HotNet_input/g2s_log2_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+        
+        time1 <- Sys.time()
+        combine <- function(x,y){
+          w1 <- rbind(x[[1]], y[[1]])
+          x1 <- rbind(x[[2]], y[[2]])
+          y1 <- rbind(x[[3]], y[[3]])
+          z1 <- rbind(x[[4]], y[[4]])
+          y1 <- y1[!duplicated(y1), ]
+          z1 <- z1[!duplicated(z1), ]
+          return(list(w1,x1,y1,z1))
+        }
+        
+        result <- foreach(i = 1:(nrow(TOMmodule)-1), .combine = 'combine', .inorder = TRUE) %dopar% {
+          result1 <- data.frame(matrix(nrow=0,ncol=2))
+          result2 <- data.frame(matrix(nrow=0,ncol=2))
+          result3 <- data.frame(matrix(nrow=0,ncol=2))
+          result4 <- data.frame(matrix(nrow=0,ncol=2))
+          for (j in (i+1):nrow(TOMmodule)){
+            if (corModule[i,j] >= 0.5 || corModule[i,j] <= -0.5){
+              result1[nrow(result1)+1,] <- c(idsModule[i], idsModule[j])
+              result2[nrow(result2)+1,] <- c(i,j)
+              if (!i %in% result3[,1]){
+                result3[nrow(result3)+1,] <- c(i, idsModule[i])
+                result4[nrow(result4)+1,] <- c(idsModule[i], abs(log2Module[i]))
+              } 
+              if (!j %in% result3[,1]){
+                result3[nrow(result3)+1,] <- c(j, idsModule[j])
+                result4[nrow(result4)+1,] <- c(idsModule[j], abs(log2Module[j]))
               }
-            }
-            if (!(is.null(goMF))){
-              if (nrow(goMF) > 0){
-                print(paste("Number of enriched molecular functions: ", nrow(goMF[goMF$p.adjust <= 0.1,])))
-                
-                write.table(goMF@result[goMF@result$p.adjust <= 0.1,], file=paste0('output/', n, '/validation/output/GO/', module, rown, 'MF.tsv'), col.names=TRUE, row.names=FALSE, sep='\t', quote=FALSE)
-                MFterms <- append(MFterms, rownames(goMF@result[goMF@result$p.adjust <= 0.1,]))
-                
-                top_MF <- head(goMF@result[order(goMF@result$p.adjust), ], 5)
-                top_MF <- top_MF %>% mutate(Description = paste("GO:MF", Description))
-              }
-            }
-            top <- rbind(top_BP,top_MF)
-            if (nrow(top) > 0){
-              top <- top[order(top$p.adjust), ]
-              png(file=paste0('output/', n, '/validation/figures/GO_', module, rown, '.png'), width=1920, height=1020)
-              print(ggplot(top, aes(x = Count, y = reorder(Description, -p.adjust), fill = p.adjust)) +
-                      geom_bar(stat = "identity") +
-                      scale_fill_gradient(low = "red", high = "blue") +
-                      labs(title = "Gene Ontology Enrichment Analysis",
-                           x = "Count",
-                           fill = "Adjusted p-value",
-                           y="") +
-                      scale_y_discrete(labels = function(x) str_wrap(x, width = 65)) +
-                      theme_prism(base_size = 18) +
-                      theme(legend.text = element_text(size=25),
-                            legend.title = element_text(size=25)))
-              dev.off()
-              write.table(top, file=paste0('output/', n, '/validation/output/GO_', module, rown, '.tsv'), row.names=TRUE, col.names=TRUE, sep='\t')
             }
           }
+          return(list(result1, result2, result3, result4))
         }
-      }  
+        time2 <- Sys.time()
+        print(paste("Slicing input:", difftime(time2, time1, units="secs")))
+        time1 <- Sys.time()
+        write.table(result[[1]], file=paste0('output/', n, '/', dataset, '/output/hotnet/HotNet_input/name_edges_expression_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+        write.table(result[[2]], file=paste0('output/', n, '/', dataset, '/output/hotnet/HotNet_input/edge_list_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+        write.table(result[[3]], file=paste0('output/', n, '/', dataset, '/output/hotnet/HotNet_input/i2g_', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+        write.table(result[[4]], file=paste0('output/', n, '/', dataset, '/output/hotnet/HotNet_input/g2s_log2', module, '.tsv'), col.names=FALSE, row.names=FALSE, sep='\t', quote=FALSE)
+        time2 <- Sys.time()
+        print(paste("Writing data:", difftime(time2, time1, units="secs")))
+        if (file.info(paste0('output/', n, '/', dataset, '/output/hotnet/HotNet_input/i2g_', module, '.tsv'))$size != 0){
+          hotnetColors <- append(hotnetColors, module)
+        }
+      }
+      
+      idsModule2 <- idsModule
+      
+      try({idsModule2[substr(idsModule2,1,3) == "LOC"] <- mapIds(org.Hs.eg.db, keys = gsub('LOC', '', idsModule2[substr(idsModule2,1,3) == "LOC"]), column = "SYMBOL", keytype="ENTREZID")}, silent=TRUE)
+      
+      try({idsModule2[which(is.na(mapIds(org.Hs.eg.db, keys = idsModule2, column = "ENTREZID", keytype="SYMBOL")))] <- mapIds(org.Hs.eg.db, keys = idsModule2[which(is.na(mapIds(org.Hs.eg.db, keys = idsModule2, column = "ENTREZID", keytype="SYMBOL")))], column = "SYMBOL", keytype="ALIAS")}, silent=TRUE)
+      
+      idsModule2[which(idsModule2 == "LOC101929759")] <- "SLCO5A1-AS1"
+      idsModule2[which(idsModule2 == "LOC107984285")] <- "LARP4B"
+      idsModule2[which(idsModule2 == "UNQ6494")] <- "LINC03062"
+      idsModule2[which(idsModule2 == "FLJ22447")] <- "LINC03033"
+      idsModule2[which(idsModule2 == "FLJ37453")] <- "SPEN-AS1"
+      idsModule2[which(idsModule2 == "MPP6")] <- "PALS2"
+      idsModule2[which(idsModule2 == "TIAF1")] <- "MYO18A"
+      idsModule2[which(idsModule2 == "H4-16")] <- "H4C16"
+      idsModule2[which(idsModule2 == "CBWD3")] <- "ZNG1C"
+      idsModule2[which(idsModule2 == "LCA10")] <- "L1CAM-AS1"  
+      
+      geneNames <- c()
+      try({geneNames <- mapIds(org.Hs.eg.db, keys = idsModule2, column = "ENTREZID", keytype = "SYMBOL")}, silent=TRUE)
+      
+      if (is.null(geneNames)){next}
+      
+      goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
+      goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
+      #goKEGG <- enricher(geneNames, pvalueCutoff = 0.1, TERM2GENE = msigdbr(species = "Homo sapiens", category = "C2", subcategory="KEGG") %>% 
+      #dplyr::select(gs_name, entrez_gene))
+      
+      top_BP <- data.frame()
+      if (!is.null(goBP)){
+        top_BP <- head(goBP@result[order(goBP@result$p.adjust), ], 5)
+        top_BP <- top_BP %>% mutate(Description = paste("GO:BP", Description))  
+      }
+      top_MF <- data.frame()
+      if (!is.null(goMF)){
+        top_MF <- head(goMF@result[order(goMF@result$p.adjust), ], 5)
+        top_MF <- top_MF %>% mutate(Description = paste("GO:MF", Description))        
+      }
+      #      top_KEGG <- data.frame()
+      #      if (!is.null(goKEGG)){
+      #        top_KEGG <- head(goKEGG@result[order(goKEGG@result$p.adjust), ], 5)
+      #        top_KEGG <- top_KEGG %>% mutate(Description = paste("KEGG", Description))        
+      #      }
+      
+      #top <- rbind(top_BP,top_MF,top_KEGG)
+      top <- rbind(top_BP,top_MF)
+      
+      if (nrow(top) > 0){
+        top <- top[order(top$p.adjust), ]   
+        png(file=paste0('output/', n, '/', dataset, '/figures/coexpression/GO_', module, '.png'), width=1920, height=1020)
+        print(ggplot(top, aes(x = Count, y = reorder(Description, -p.adjust), fill = p.adjust)) +
+                geom_bar(stat = "identity") +
+                scale_fill_gradient(low = "red", high = "blue") +
+                labs(title = "Gene Ontology Enrichment Analysis",
+                     x = "Count",
+                     fill = "Adjusted p-value",
+                     y="") +
+                scale_y_discrete(labels = function(x) str_wrap(x, width = 60)) +
+                theme_prism(base_size = 28) +
+                theme(plot.title = element_text(hjust = 0.75)) +
+                theme(legend.text = element_text(size=24),
+                      legend.title = element_text(size=26)))
+        dev.off()
+      }
+      
+      write.table(goBP@result[goBP@result$p.adjust <= 0.1,], file=paste0('output/', n, '/', dataset, '/output/coexpression/GO_', module, 'BP.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
+      write.table(goMF@result[goMF@result$p.adjust <= 0.1,], file=paste0('output/', n, '/', dataset, '/output/coexpression/GO_', module, 'MF.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
+      #   write.table(goKEGG@result[goKEGG@result$p.adjust <= 0.1,], file=paste0('output/', n, '/', dataset, '/output/coexpression/', module, 'KEGG.tsv'), col.names=TRUE, row.names=TRUE, sep='\t', quote=FALSE)
+      write.table(top, file=paste0('output/', n, '/', dataset, '/output/coexpression/GO_', module, '.tsv'), row.names=TRUE, col.names=TRUE, sep='\t')
+      
+      #    
+      #      par(mar = c(1, 1, 1, 1))
+      #      png(file=paste0('output/', n, '/', dataset, '/figures/coexpression/', module, '_matrix.png'), width=1920, height=1020)
+      #        plotMat(t(scale(t(d.subset.adj[colorDynamicTOM==module,]))),rlabels=T,
+      #                clabels=T,rcols=module,
+      #                title=module, cex.lab = 2, cex.axis = 2, cex.main = 2)
+      #      dev.off()
+      #      
+      #      ME=datME[, paste0("ME",module)]
+      #      par(mar = c(2, 1, 1, 1))
+      #      png(file=paste0('output/', n, '/', dataset, '/figures/coexpression/', module, '_ME.png'), width=1920, height=1020)
+      #      barplot(ME, col=module, main="", cex.main=2,
+      #              ylab="eigengene expression",xlab="array sample", cex.lab = 2, cex.axis = 2, cex.main = 2)
+      #      dev.off()
+      #      
+      #      par(mfrow = c(1,1));
+      #      column <- match(module, modNames);
+      #      png(file=paste0('output/', n, '/', dataset, '/figures/coexpression/', module, '_membershipVSsignficance.png'), width=1920, height=1020)
+      #        verboseScatterplot(abs(geneModuleMembership[inModule, column]),
+      #                           abs(GS1[inModule, 1]),
+      #                           xlab = paste("Module Membership in", module, "module"),
+      #                           ylab = "Gene significance",
+      #                           main = paste("Module membership vs. gene significance\n"),
+      #                           cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+      #      dev.off()
+      #      
+      #      }
     }
+    
+    time1 <- Sys.time()
+    system(paste('bash', paste(argv[1],'/src/run_hierarchicalHotnet_modules.sh "', sep=""), paste(hotnetColors, collapse=' '), '" ', cutOff, n, dataset))
+    time2 <- Sys.time()
+    print(paste("Hierarchical HotNet:", difftime(time2, time1, units="secs")))
+    
+    time1 <- Sys.time()
+    
+    BPterms <- c()
+    MFterms <- c()
+    genes <- c()
+    subnetworks <- c()
+    hotnetSubnetworks <- c()
+    
+    for (module in hotnetColors){
+      if (file.exists(file=paste0('output/', n, '/', dataset, '/output/hotnet/HotNet_results/clusters_hierarchies_log2_', module, '.tsv'))){
+        p <- read.table(file=paste0('output/', n, '/', dataset, '/output/hotnet/HotNet_results/clusters_hierarchies_log2_', module, '.tsv'), sep='\t', header= FALSE, comment.char="")[6, "V1"]
+        p <- as.numeric(sub(".*: ", "", p))
+        if (file.exists(paste0('output/', n, '/', dataset, '/output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv')) &&
+            file.info(paste0('output/', n, '/', dataset, '/output/hotnet//HotNet_results/consensus_nodes_log2_', module, '.tsv'))$size == 0){
+          next
+        }
+        if (!(module %in% hotnetSubnetworks)){hotnetSubnetworks <- append(hotnetSubnetworks, module)}
+        if (p <= 0.1){
+          print(module)
+          if (!(module %in% subnetworks)){subnetworks <- append(subnetworks, module)}
+          nodes <- read.csv(paste0('output/', n, '/', dataset, '/output/hotnet/HotNet_results/consensus_nodes_log2_', module, '.tsv'), sep='\t', header = FALSE)
+          edges <- read.csv(paste0('output/', n, '/', dataset, '/output/hotnet/HotNet_results/consensus_edges_log2_', module, '.tsv'), sep='\t', header = FALSE)
+          tidy_basic <- edges %>% 
+            as_tbl_graph()
+          scores <- d.subset.summary[unlist(nodes)[nzchar(unlist(nodes))],"log2FC"]
+          tidy_basic_manipulated <- tidy_basic %>% 
+            activate(nodes) %>%
+            mutate(colours = scores)  
+          
+          png(file=paste0('output/', n, '/', dataset, '/figures/GO/', module, '_subnetwork.png'), width=1920, height=1020)
+          print(ggraph(tidy_basic_manipulated, layout = 'circle')+
+                  geom_edge_link(width = 1.2,alpha=0.2) +
+                  geom_node_point(aes(color = scores), size=15) +
+                  coord_fixed() +
+                  geom_node_text(aes(label = name,fontface='bold'),size=5.5, repel=TRUE) +
+                  scale_color_gradient2(low = "blue", mid="white", high = "red", limits = c(3,3), breaks = c(-2.5,-2,-1,0,1,2,2.5)) +
+                  scale_x_continuous(limits=c(-2,2)) +
+                  scale_y_continuous(limits=c(-2,2)) +
+                  labs(colour="Log-fold change", title=paste(module, "subnetwork")) +
+                  theme_prism(base_size = 25,base_fontface = "bold") +
+                  theme(legend.key.height = unit(30, "pt"),
+                        legend.title = element_text(size=20),
+                        legend.key.width = unit(15, "pt"),
+                        legend.text = element_text(size=20),
+                        legend.position = c(1.1, 0.5)))
+          dev.off()
+          
+          for (rown in nrow(nodes)){
+            nodes2 <- unlist(nodes[rown,])[nzchar(unlist(nodes[rown,]))]
+            unlist(nodes)[nzchar(unlist(nodes))]
+            print(paste("In subnetwork: ", nodes2))
+            genes <- append(genes, nodes2)
+            
+            log2Subnetwork <- log2vals[nodes2]
+            print(paste("Log-fold changes: ", log2Subnetwork))
+            
+            PSubnetwork <- pvals[nodes2]
+            print(paste("P-values: ", PSubnetwork))
+            
+            try({nodes2[substr(nodes2,1,3) == "LOC"] <- mapIds(org.Hs.eg.db, keys = gsub('LOC', '', nodes2[substr(nodes2,1,3) == "LOC"]), column = "SYMBOL", keytype="ENTREZID")}, silent=TRUE)
+            
+            try({nodes2[which(is.na(mapIds(org.Hs.eg.db, keys = nodes2, column = "ENTREZID", keytype="SYMBOL")))] <- mapIds(org.Hs.eg.db, keys = nodes2[which(is.na(mapIds(org.Hs.eg.db, keys = nodes2, column = "ENTREZID", keytype="SYMBOL")))], column = "SYMBOL", keytype="ALIAS")}, silent=TRUE)
+            
+            nodes2[which(nodes2 == "LOC101929759")] <- "SLCO5A1-AS1"
+            nodes2[which(nodes2 == "LOC107984285")] <- "LARP4B"
+            nodes2[which(nodes2 == "UNQ6494")] <- "LINC03062"
+            nodes2[which(nodes2 == "FLJ22447")] <- "LINC03033"
+            nodes2[which(nodes2 == "FLJ37453")] <- "SPEN-AS1"
+            nodes2[which(nodes2 == "MPP6")] <- "PALS2"
+            nodes2[which(nodes2 == "TIAF1")] <- "MYO18A"
+            nodes2[which(nodes2 == "H4-16")] <- "H4C16"
+            nodes2[which(nodes2 == "CBWD3")] <- "ZNG1C"
+            nodes2[which(nodes2 == "LCA10")] <- "L1CAM-AS1"  
+            
+            geneNames <- c()
+            try({geneNames <- mapIds(org.Hs.eg.db, keys = nodes2, column = "ENTREZID", keytype = "SYMBOL")}, silent=TRUE)
+            
+            print(paste("Number of genes: ", length(geneNames)))
+            if (is.null(geneNames)){next}
+            else {
+              goBP <- enrichGO(geneNames, ont="BP", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
+              goMF <- enrichGO(geneNames, ont="MF", keyType = "ENTREZID", pvalueCutoff = 0.1, OrgDb=org.Hs.eg.db)
+              top_BP <- data.frame()
+              top_MF <- data.frame()
+              if (!(is.null(goBP))){
+                if (nrow(goBP) > 0){
+                  print(paste("Number of enriched biological processes: ", nrow(goBP[goBP$p.adjust <= 0.1,])))
+                  
+                  write.table(goBP@result[goBP@result$p.adjust <= 0.1,], file=paste0('output/', n, '/', dataset, '/output/GO/', module, rown, 'BP.tsv'), col.names=TRUE, row.names=FALSE, sep='\t', quote=FALSE)
+                  BPterms <- append(BPterms, rownames(goBP@result[goBP@result$p.adjust <= 0.1,]))
+                  
+                  top_BP <- head(goBP@result[order(goBP@result$p.adjust), ], 5)
+                  top_BP <- top_BP %>% mutate(Description = paste("GO:BP", Description))  
+                }
+              }
+              if (!(is.null(goMF))){
+                if (nrow(goMF) > 0){
+                  print(paste("Number of enriched molecular functions: ", nrow(goMF[goMF$p.adjust <= 0.1,])))
+                  
+                  write.table(goMF@result[goMF@result$p.adjust <= 0.1,], file=paste0('output/', n, '/', dataset, '/output/GO/', module, rown, 'MF.tsv'), col.names=TRUE, row.names=FALSE, sep='\t', quote=FALSE)
+                  MFterms <- append(MFterms, rownames(goMF@result[goMF@result$p.adjust <= 0.1,]))
+                  
+                  top_MF <- head(goMF@result[order(goMF@result$p.adjust), ], 5)
+                  top_MF <- top_MF %>% mutate(Description = paste("GO:MF", Description))
+                }
+              }
+              top <- rbind(top_BP,top_MF)
+              if (nrow(top) > 0){
+                top <- top[order(top$p.adjust), ]
+                png(file=paste0('output/', n, '/', dataset, '/figures/GO/', module, rown, '.png'), width=1920, height=1020)
+                print(ggplot(top, aes(x = Count, y = reorder(Description, -p.adjust), fill = p.adjust)) +
+                        geom_bar(stat = "identity") +
+                        scale_fill_gradient(low = "red", high = "blue") +
+                        labs(title = "Gene Ontology Enrichment Analysis",
+                             x = "Count",
+                             fill = "Adjusted p-value",
+                             y="") +
+                        scale_y_discrete(labels = function(x) str_wrap(x, width = 65)) +
+                        theme_prism(base_size = 18) +
+                        theme(legend.text = element_text(size=25),
+                              legend.title = element_text(size=25)))
+                dev.off()
+                write.table(top, file=paste0('output/', n, '/', dataset, '/output/GO/', module, rown, '.tsv'), row.names=TRUE, col.names=TRUE, sep='\t')
+              }
+            }
+          }
+        }  
+      }
+    }
+    
+    write.table(BPterms, file=paste0('output/', n, '/', dataset, '/output/GO/BP.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
+    write.table(MFterms, file=paste0('output/', n, '/', dataset, '/output/GO/MF.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
+    write.table(genes, file=paste0('output/', n, '/', dataset, '/output/GO/genes.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
+    write.table(subnetworks, file=paste0('output/', n, '/', dataset, '/output/GO/subnetworks.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
+    write.table(hotnetSubnetworks, file=paste0('output/', n, '/', dataset, '/output/GO/hotnetSubnetworks.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
+    save(BPterms, file=paste0('output/', n, '/', dataset, '/rdata/BP.RData'))
+    save(MFterms, file=paste0('output/', n, '/', dataset, '/rdata/MF.RData'))
+    save(genes, file=paste0('output/', n, '/', dataset, '/rdata/genes.RData'))
+    save(subnetworks, file=paste0('output/', n, '/', dataset, '/rdata/subnetworks.RData'))
+    
+    time2 <- Sys.time()
+    print(paste("GO:", difftime(time2, time1, units="secs")))
+    endTime <- Sys.time()
+    print(paste("Total time:", difftime(endTime, startTime, units="secs")))
+    
   }
-  
-  write.table(BPterms, file=paste0('output/', n, '/validation/output/GO/BP.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  write.table(MFterms, file=paste0('output/', n, '/validation/output/GO/MF.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  write.table(genes, file=paste0('output/', n, '/validation/output/GO/genes.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  write.table(subnetworks, file=paste0('output/', n, '/validation/output/GO/subnetworks.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  write.table(hotnetSubnetworks, file=paste0('output/', n, '/validation/output/GO/hotnetSubnetworks.tsv'), row.names=FALSE, col.names=FALSE, sep='\t')
-  save(BPterms, file=paste0('output/', n, '/validation/rdata/BP.RData'))
-  save(MFterms, file=paste0('output/', n, '/validation/rdata/MF.RData'))
-  save(genes, file=paste0('output/', n, '/validation/rdata/genes.RData'))
-  save(subnetworks, file=paste0('output/', n, '/validation/rdata/subnetworks.RData'))
-  
-  time2 <- Sys.time()
-  print(paste("GO:", difftime(time2, time1, units="secs")))
-  endTime <- Sys.time()
-  print(paste("Total time:", difftime(endTime, startTime, units="secs")))
-  
   dir.create(paste0('output/', n, '/validation/output/similarity'))
   dir.create(paste0('output/', n, '/validation/figures/similarity'))
-  
-  similarity <- similarity.analysis(paste0('output/', n, '/training/output'), paste0('output/', n, '/validation/output'), paste0('output/', n, '/validation/output/similarity'))
+  similarity <- similarity.analysis(paste0('output/', n, '/exploration/output'), paste0('output/', n, '/validation/output'), paste0('output/', n, '/validation/output/similarity'))
   
   print(paste('END OF RUN', n))
+  
 }
 
 similarityModules1 <- as.matrix(read.table(paste0('output/1/validation/output/similarity/moduleSimilarity.tsv'), sep='\t'))
@@ -1737,7 +1049,7 @@ modules1[, 'Name2'] <- rownames(similarityModules1)[apply(similarityModules1,2,w
 modules1[,'Run'] <- 1
 modules1[, 'Similarity'] <- apply(similarityModules1,2,max)
 for (i in 1:nrow(modules1)){
-  modules1[i, 'Size1'] <- length(as.vector(t(read.table(paste0('output/1/training/output/coexpression/', row.names(modules1[i,]), '.tsv'), sep='\t', header = FALSE))))
+  modules1[i, 'Size1'] <- length(as.vector(t(read.table(paste0('output/1/exploration/output/coexpression/', row.names(modules1[i,]), '.tsv'), sep='\t', header = FALSE))))
   modules1[i, 'Size2'] <- length(as.vector(t(read.table(paste0('output/1/validation/output/coexpression/', modules1[i, 'Name2'], '.tsv'), sep='\t', header = FALSE))))
 }
 
@@ -1749,7 +1061,7 @@ modules2[, 'Name2'] <- rownames(similarityModules2)[apply(similarityModules2,2,w
 modules2[,'Run'] <- 2
 modules2[, 'Similarity'] <- apply(similarityModules2,2,max)
 for (i in 1:nrow(modules2)){
-  modules2[i, 'Size1'] <- length(as.vector(t(read.table(paste0('output/2/training/output/coexpression/', row.names(modules2[i,]), '.tsv'), sep='\t', header = FALSE))))
+  modules2[i, 'Size1'] <- length(as.vector(t(read.table(paste0('output/2/exploration/output/coexpression/', row.names(modules2[i,]), '.tsv'), sep='\t', header = FALSE))))
   modules2[i, 'Size2'] <- length(as.vector(t(read.table(paste0('output/2/validation/output/coexpression/', modules2[i, 'Name2'], '.tsv'), sep='\t', header = FALSE))))
 }
 
@@ -1761,7 +1073,7 @@ modules3[, 'Name2'] <- rownames(similarityModules3)[apply(similarityModules3,2,w
 modules3[, 'Similarity'] <- apply(similarityModules3,2,max)
 modules3[,'Run'] <- 3
 for (i in 1:nrow(modules3)){
-  modules3[i, 'Size1'] <- length(as.vector(t(read.table(paste0('output/3/training/output/coexpression/', row.names(modules3[i,]), '.tsv'), sep='\t', header = FALSE))))
+  modules3[i, 'Size1'] <- length(as.vector(t(read.table(paste0('output/3/exploration/output/coexpression/', row.names(modules3[i,]), '.tsv'), sep='\t', header = FALSE))))
   modules3[i, 'Size2'] <- length(as.vector(t(read.table(paste0('output/3/validation/output/coexpression/', modules3[i, 'Name2'], '.tsv'), sep='\t', header = FALSE))))
 }
 
