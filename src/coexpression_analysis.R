@@ -69,7 +69,6 @@ coexpression.analysis <- function(d, d.log2fc, outfolder, figfolder, i, stage, p
     #              col=module, xlab='group', ylab='ME value', cex.lab = 2, cex.axis = 2, cex.main = 2, cex.colorLabels = 2)
     #    dev.off()
   }
-  # Multiple testing correction
   p.adj <- p.adjust(unlist(pvals.modules))
   pval.modules.adj <- pvals.modules
   for (j in 1:ncol(pvals.modules)){
