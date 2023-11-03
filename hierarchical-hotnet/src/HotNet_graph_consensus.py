@@ -7,6 +7,7 @@ import networkx as nx
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+warnings.filterwarnings('ignore')
 
 from hhio import save_index_gene, save_edge_list, save_gene_score
 
