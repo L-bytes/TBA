@@ -49,7 +49,7 @@ variant <- "G12"
 
 time1 <- Sys.time()
 d <- data.frame(fread('./data/TCGA_rna_count_data.csv', header=TRUE), check.names = FALSE, row.names = 1)
-d <- d[250:1000,1:100]
+#d <- d[250:1000,1:100] #Adjust to reasonable amount depending on computational power
 group.data <- data.frame(fread('./data/non_silent_mutation_profile_crc.csv', header=TRUE), row.names=1)
 if (variant != ""){
   mut <- read.csv('./data/TCGA_mutation_definition_data.csv', check.names=FALSE)
